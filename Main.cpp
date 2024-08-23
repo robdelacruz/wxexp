@@ -4,6 +4,7 @@
 #include "wx/listctrl.h"
 #include "clib.h"
 #include "Db.h"
+#include "ExpListView.h"
 
 enum {
     ID_EXPENSES_PANEL = wxID_HIGHEST,
@@ -26,8 +27,6 @@ public:
 
     void CreateControls();
     void RefreshControls();
-
-    void OnSize(wxSizeEvent& e);
 };
 
 class ExpApp : public wxApp {
@@ -37,7 +36,6 @@ public:
 wxIMPLEMENT_APP(ExpApp);
 
 wxBEGIN_EVENT_TABLE(ExpFrame, wxFrame)
-    EVT_SIZE(ExpFrame::OnSize)
 wxEND_EVENT_TABLE()
 
 bool ExpApp::OnInit() {
@@ -78,18 +76,6 @@ static void SetFontSize(wxWindow *w, int pointSize) {
     w->SetFont(font);
 }
 
-static void FitListViewColumnWidths(wxListView *lv) {
-    int ncols = lv->GetColumnCount();
-    if (ncols == 0)
-        return;
-
-    int w = lv->GetClientSize().GetWidth();
-    for (int i=0; i < ncols-1; i++)
-        w -= lv->GetColumnWidth(i);
-
-    lv->SetColumnWidth(ncols-1, w);
-}
-
 void ExpFrame::CreateControls() {
     wxPanel *pnl = new wxPanel(this, ID_EXPENSES_PANEL, wxDefaultPosition, wxDefaultSize);
 
@@ -108,9 +94,9 @@ void ExpFrame::CreateControls() {
     chYears->SetSelection(0);
     SetFontSize(chYears, 8);
 
-    //wxListView *lv = new wxListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize, wxLC_REPORT);
-    //wxListView *lv = new wxListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize, wxLC_REPORT|wxLC_NO_HEADER);
-    wxListView *lv = new wxListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize);
+    //ExpListView *lv = new ExpListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize, wxLC_REPORT);
+    //ExpListView *lv = new ExpListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize, wxLC_REPORT|wxLC_NO_HEADER);
+    ExpListView *lv = new ExpListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize);
     lv->AppendColumn("Date");
     lv->AppendColumn("Description");
     lv->AppendColumn("Amount");
@@ -140,7 +126,7 @@ void ExpFrame::CreateControls() {
 }
 
 void ExpFrame::RefreshControls() {
-    wxListView *lv = (wxListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
+    ExpListView *lv = (ExpListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
     assert(lv != NULL);
 
     vector<Expense> xps;
@@ -157,14 +143,5 @@ void ExpFrame::RefreshControls() {
     lv->SetColumnWidth(1, -1);
     lv->SetColumnWidth(2, -1);
     lv->SetColumnWidth(3, -1);
-}
-
-void ExpFrame::OnSize(wxSizeEvent& e) {
-    printf("OnSize()\n");
-    wxListView *lv = (wxListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
-    assert(lv != NULL);
-    FitListViewColumnWidths(lv);
-
-    e.Skip(true);
 }
 

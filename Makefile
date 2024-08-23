@@ -2,7 +2,7 @@ CC=gcc
 CXX=g++
 
 CSOURCES=clib.c
-CPPSOURCES=Db.cpp Main.cpp
+CPPSOURCES=Db.cpp Main.cpp ExpListView.cpp
 COBJECTS=$(patsubst %.c, %.o, $(CSOURCES))
 CPPOBJECTS=$(patsubst %.cpp, %.o, $(CPPSOURCES))
 OBJECTS=$(COBJECTS) $(CPPOBJECTS) sqlite3.o
