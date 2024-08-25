@@ -3,8 +3,8 @@
 #include "wx/colour.h"
 #include "wx/spinctrl.h"
 #include "wx/listctrl.h"
-#include "Db.h"
-#include "ExpListView.h"
+#include "db.h"
+#include "extras.h"
 
 enum {
     ID_START = wxID_HIGHEST,
@@ -103,26 +103,41 @@ void ExpFrame::CreateControls() {
     wxPanel *pnl = new wxPanel(this, ID_EXPENSES_PANEL, wxDefaultPosition, wxDefaultSize);
 
     wxPanel *ctrlpanel = new wxPanel(pnl, wxID_ANY, wxDefaultPosition, wxDefaultSize);
-    wxSpinCtrl *spinYear = new wxSpinCtrl(ctrlpanel, ID_EXPENSES_YEAR, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1900, 2100, 2024);
+//    wxSpinCtrl *spinYear = new wxSpinCtrl(ctrlpanel, ID_EXPENSES_YEAR, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1900, 2100, 2024);
+//    wxArrayString months;
+//    for (int i=1; i <= 12; i++)
+//        months.Add(wxDateTime(date_from_cal(2000, i, 1)).Format("%B"));
+//    wxChoice *chMonth = new wxChoice(ctrlpanel, ID_EXPENSES_MONTH, wxDefaultPosition, wxDefaultSize, months);
+//    int currentmonth;
+//    date_to_cal(date_today(), NULL, &currentmonth, NULL);
+//    chMonth->SetSelection(currentmonth-1);
+
     wxArrayString months;
-    for (int i=1; i <= 12; i++)
-        months.Add(wxDateTime(date_from_cal(2000, i, 1)).Format("%B"));
+    for (int i=0; i < 12; i++) {
+        wxString month = (wxDateTime::Now().SetMonth((wxDateTime::Month) (wxDateTime::Jan + i)).Format("%B"));
+        months.Add(month);
+    }
     wxChoice *chMonth = new wxChoice(ctrlpanel, ID_EXPENSES_MONTH, wxDefaultPosition, wxDefaultSize, months);
-    int currentmonth;
-    date_to_cal(date_today(), NULL, &currentmonth, NULL);
-    chMonth->SetSelection(currentmonth-1);
+    chMonth->SetSelection(wxDateTime::Now().GetMonth() - wxDateTime::Jan);
 
     wxBoxSizer *hb = new wxBoxSizer(wxHORIZONTAL);
-    hb->AddStretchSpacer();
-    hb->Add(spinYear, 0, wxEXPAND | wxALL, 10);
-    hb->AddSpacer(5);
-    hb->Add(chMonth, 0, wxEXPAND | wxALL, 10);
+    hb->Add(new wxStaticText(ctrlpanel, wxID_ANY, "Month:"), 0, wxALIGN_CENTER, 0);
+    hb->Add(chMonth, 0, wxALIGN_CENTER, 0);
     ctrlpanel->SetSizer(hb);
 
-    ExpListView *lv = new ExpListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize);
+    FitListView *lv = new FitListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize);
+    lv->AppendColumn("Date");
+    lv->AppendColumn("Description");
+    lv->AppendColumn("Amount");
+    lv->AppendColumn("Category");
+    lv->SetColumnWidth(0, wxLIST_AUTOSIZE_USEHEADER);
+    lv->SetColumnWidth(1, 150);
+    lv->SetColumnWidth(2, wxLIST_AUTOSIZE_USEHEADER);
+    lv->SetColumnWidth(3, wxLIST_AUTOSIZE_USEHEADER);
 
     wxBoxSizer *vb = new wxBoxSizer(wxVERTICAL);
     vb->Add(ctrlpanel, 0, wxEXPAND, 0);
+    vb->AddSpacer(5);
     vb->Add(lv, 1, wxEXPAND, 0);
     pnl->SetSizer(vb);
 
@@ -130,19 +145,32 @@ void ExpFrame::CreateControls() {
     vb->Add(pnl, 1, wxEXPAND, 0);
     SetSizer(vb);
 
-    SetBackgroundColour(wxColour(0x1f,0x29,0x37));
-    SetForegroundColour(wxColour(0xe5,0xe7,0xeb));
-    SetColorsFromParent(pnl);
+//    SetBackgroundColour(wxColour(0x1f,0x29,0x37));
+//    SetForegroundColour(wxColour(0xe5,0xe7,0xeb));
+//    SetColorsFromParent(pnl);
 //    SetColorsFromParent(ctrlpanel);
 
-    SetColorsFromParent(lv);
-    SetColorsFromParent(spinYear);
-    SetColorsFromParent(chMonth);
+//    SetColorsFromParent(lv);
+//    SetColorsFromParent(spinYear);
+//    SetColorsFromParent(chMonth);
 }
 
 void ExpFrame::RefreshControls() {
-    ExpListView *lv = (ExpListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
+    FitListView *lv = (FitListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
     assert(lv != NULL);
-    lv->LoadExpenses(db, 2024, 6);
+
+    vector<Expense> xps;
+    SelectExpensesByMonth(db, 2024, 6, xps);
+    for (int i=0; i < (int) xps.size(); i++) {
+        Expense xp = xps[i];
+        lv->InsertItem(i, wxDateTime(xp.date).Format("%m-%d"));
+        lv->SetItem(i, 1, xp.desc);
+        lv->SetItem(i, 2, wxString::Format("%'9.2f", xp.amt));
+        lv->SetItem(i, 3, xp.catname);
+    }
+    lv->SetColumnWidth(0, -1);
+    lv->SetColumnWidth(1, -1);
+    lv->SetColumnWidth(2, -1);
+    lv->SetColumnWidth(3, -1);
 }
 

@@ -9,8 +9,7 @@
 #include <iostream>
 #include <vector>
 #include "sqlite3/sqlite3.h"
-#include "clib.h"
-#include "Db.h"
+#include "db.h"
 using namespace std;
 
 static void db_print_err(sqlite3 *db, const char *sql) {

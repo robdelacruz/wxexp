@@ -2,7 +2,7 @@ CC=gcc
 CXX=g++
 
 CSOURCES=clib.c
-CPPSOURCES=Db.cpp Main.cpp ExpListView.cpp
+CPPSOURCES=db.cpp eb.cpp extras.cpp
 COBJECTS=$(patsubst %.c, %.o, $(CSOURCES))
 CPPOBJECTS=$(patsubst %.cpp, %.o, $(CPPSOURCES))
 OBJECTS=$(COBJECTS) $(CPPOBJECTS) sqlite3.o
@@ -16,7 +16,7 @@ WX_CXXFLAGS=`wx-config --cxxflags`
 WX_LIBS=`wx-config --libs std`
 
 CFLAGS= -std=gnu99 -Wall -Werror -Wno-unused -Wno-deprecated-declarations
-CPPFLAGS=-g -Wall -Werror -Wno-deprecated-declarations
+CPPFLAGS=-g -Wall -Werror -Wno-unused-function
 CPPFLAGS+= $(WX_CXXFLAGS)
 LDFLAGS=$(WX_LIBS)
 
