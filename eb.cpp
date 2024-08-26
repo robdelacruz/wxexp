@@ -4,45 +4,8 @@
 #include "wx/spinctrl.h"
 #include "wx/listctrl.h"
 #include "db.h"
-#include "extras.h"
-
-enum {
-    ID_START = wxID_HIGHEST,
-    ID_VIEW_EXP,
-    ID_VIEW_CAT,
-    ID_VIEW_YTD,
-    ID_EXPENSES_PANEL,
-    ID_EXPENSES_YEAR,
-    ID_EXPENSES_MONTH,
-    ID_EXPENSES_LISTVIEW,
-    ID_COUNT
-};
-
-class ExpFrame : public wxFrame {
-private:
-    sqlite3 *db;
-    int selYear;
-    int selMonth;
-
-    wxDECLARE_EVENT_TABLE();
-
-public:
-    ExpFrame(const wxString& title);
-    ~ExpFrame();
-
-    void CreateMenu();
-    void CreateControls();
-    void RefreshControls();
-};
-
-class ExpApp : public wxApp {
-public:
-    virtual bool OnInit();
-};
-wxIMPLEMENT_APP(ExpApp);
-
-wxBEGIN_EVENT_TABLE(ExpFrame, wxFrame)
-wxEND_EVENT_TABLE()
+#include "wxutil.h"
+#include "eb.h"
 
 bool ExpApp::OnInit() {
     ExpFrame *w = new ExpFrame("Expense Buddy GUI");
@@ -50,28 +13,17 @@ bool ExpApp::OnInit() {
     return true;
 }
 
-static void SetColorsFromParent(wxWindow *w) {
-    wxWindow *parent = w->GetParent();
-    if (parent == NULL)
-        return;
-
-    w->SetBackgroundColour(parent->GetBackgroundColour());
-    w->SetForegroundColour(parent->GetForegroundColour());
-}
-
-static void SetFontSize(wxWindow *w, int pointSize) {
-    wxFont font = w->GetFont();
-    font.SetPointSize(pointSize);
-    w->SetFont(font);
-}
-
 ExpFrame::ExpFrame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(400,480)) {
     setlocale(LC_NUMERIC, "");
-    SetFontSize(this, 10);
+    setFontSize(this, 10);
 
     int z = open_expense_file("rob.db", &db);
     if (z != 0)
         quit("Expense file not found.");
+
+    wxDateTime today = wxDateTime::Now();
+    selYear = today.GetYear();
+    selMonth = today.GetMonth() - wxDateTime::Jan + 1;
 
     CreateMenu();
     CreateControls();
@@ -100,32 +52,13 @@ void ExpFrame::CreateMenu() {
 }
 
 void ExpFrame::CreateControls() {
-    wxPanel *pnl = new wxPanel(this, ID_EXPENSES_PANEL, wxDefaultPosition, wxDefaultSize);
+    wxPanel *pnlTop = createPanel(this, ID_EXPENSES_PANEL);
+    wxPanel *pnlHead = createPanel(pnlTop);
 
-    wxPanel *ctrlpanel = new wxPanel(pnl, wxID_ANY, wxDefaultPosition, wxDefaultSize);
-//    wxSpinCtrl *spinYear = new wxSpinCtrl(ctrlpanel, ID_EXPENSES_YEAR, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1900, 2100, 2024);
-//    wxArrayString months;
-//    for (int i=1; i <= 12; i++)
-//        months.Add(wxDateTime(date_from_cal(2000, i, 1)).Format("%B"));
-//    wxChoice *chMonth = new wxChoice(ctrlpanel, ID_EXPENSES_MONTH, wxDefaultPosition, wxDefaultSize, months);
-//    int currentmonth;
-//    date_to_cal(date_today(), NULL, &currentmonth, NULL);
-//    chMonth->SetSelection(currentmonth-1);
+    wxStaticText *st = new wxStaticText(pnlHead, ID_EXPENSES_CAPTION, "Expenses"); 
+    wxButton *btnChangeDate = createButton(pnlHead, "Change", ID_EXPENSES_CHANGEDATE);
 
-    wxArrayString months;
-    for (int i=0; i < 12; i++) {
-        wxString month = (wxDateTime::Now().SetMonth((wxDateTime::Month) (wxDateTime::Jan + i)).Format("%B"));
-        months.Add(month);
-    }
-    wxChoice *chMonth = new wxChoice(ctrlpanel, ID_EXPENSES_MONTH, wxDefaultPosition, wxDefaultSize, months);
-    chMonth->SetSelection(wxDateTime::Now().GetMonth() - wxDateTime::Jan);
-
-    wxBoxSizer *hb = new wxBoxSizer(wxHORIZONTAL);
-    hb->Add(new wxStaticText(ctrlpanel, wxID_ANY, "Month:"), 0, wxALIGN_CENTER, 0);
-    hb->Add(chMonth, 0, wxALIGN_CENTER, 0);
-    ctrlpanel->SetSizer(hb);
-
-    FitListView *lv = new FitListView(pnl, ID_EXPENSES_LISTVIEW, wxDefaultPosition, wxDefaultSize);
+    FitListView *lv = new FitListView(pnlTop, ID_EXPENSES_LISTVIEW);
     lv->AppendColumn("Date");
     lv->AppendColumn("Description");
     lv->AppendColumn("Amount");
@@ -135,31 +68,32 @@ void ExpFrame::CreateControls() {
     lv->SetColumnWidth(2, wxLIST_AUTOSIZE_USEHEADER);
     lv->SetColumnWidth(3, wxLIST_AUTOSIZE_USEHEADER);
 
-    wxBoxSizer *vb = new wxBoxSizer(wxVERTICAL);
-    vb->Add(ctrlpanel, 0, wxEXPAND, 0);
-    vb->AddSpacer(5);
-    vb->Add(lv, 1, wxEXPAND, 0);
-    pnl->SetSizer(vb);
+    wxBoxSizer *hs = createHSizer();
+    hs->Add(st, 0, wxALIGN_CENTER, 0);
+    hs->AddSpacer(8);
+    hs->Add(btnChangeDate, 0, wxALIGN_CENTER, 0);
+    pnlHead->SetSizer(hs);
 
-    vb = new wxBoxSizer(wxVERTICAL);
-    vb->Add(pnl, 1, wxEXPAND, 0);
-    SetSizer(vb);
+    wxBoxSizer *vs = createVSizer();
+    vs->Add(pnlHead, 0, wxEXPAND, 0);
+    vs->AddSpacer(5);
+    vs->Add(lv, 1, wxEXPAND, 0);
+    pnlTop->SetSizer(vs);
 
-//    SetBackgroundColour(wxColour(0x1f,0x29,0x37));
-//    SetForegroundColour(wxColour(0xe5,0xe7,0xeb));
-//    SetColorsFromParent(pnl);
-//    SetColorsFromParent(ctrlpanel);
-
-//    SetColorsFromParent(lv);
-//    SetColorsFromParent(spinYear);
-//    SetColorsFromParent(chMonth);
+    vs = createVSizer();
+    vs->Add(pnlTop, 1, wxEXPAND | wxALL, 10);
+    SetSizer(vs);
 }
 
 void ExpFrame::RefreshControls() {
+    wxStaticText *stExpensesCaption = (wxStaticText *) wxWindow::FindWindowById(ID_EXPENSES_CAPTION, this);
+    assert(stExpensesCaption != NULL);
+    wxDateTime selDate = wxDateTime(1, wxenumMonth(selMonth), selYear);
+    stExpensesCaption->SetLabelText(selDate.Format("%B, %Y"));
+
     FitListView *lv = (FitListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
     assert(lv != NULL);
 
-    vector<Expense> xps;
     SelectExpensesByMonth(db, 2024, 6, xps);
     for (int i=0; i < (int) xps.size(); i++) {
         Expense xp = xps[i];
@@ -167,10 +101,85 @@ void ExpFrame::RefreshControls() {
         lv->SetItem(i, 1, xp.desc);
         lv->SetItem(i, 2, wxString::Format("%'9.2f", xp.amt));
         lv->SetItem(i, 3, xp.catname);
+        lv->SetItemData(i, i);
     }
-    lv->SetColumnWidth(0, -1);
-    lv->SetColumnWidth(1, -1);
-    lv->SetColumnWidth(2, -1);
-    lv->SetColumnWidth(3, -1);
+    if (lv->GetItemCount() > 0) {
+        lv->SetColumnWidth(0, -1);
+        lv->SetColumnWidth(1, -1);
+        lv->SetColumnWidth(2, -1);
+        lv->SetColumnWidth(3, -1);
+
+        lv->SetItemState(0, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+        lv->EnsureVisible(0);
+    }
+}
+
+void ExpFrame::OnFileExit(wxCommandEvent& e) {
+    Close(true);
+}
+void ExpFrame::OnChangeDate(wxCommandEvent& e) {
+    ChangeDateDialog dlg(this, selYear, selMonth);
+    dlg.ShowModal();
+}
+
+void ExpFrame::OnExpenseActivated(wxListEvent& e) {
+    wxListItem li = e.GetItem();
+    int ixps = (int) li.GetData();
+    if (ixps > (int) xps.size()-1)
+        return;
+    Expense xp = xps[ixps];
+
+    printf("desc: '%s'\n", xp.desc.c_str());
+}
+
+ChangeDateDialog::ChangeDateDialog(wxWindow *parent, int year, int month) : wxDialog(parent, wxID_ANY, "Change Date") {
+    m_year = year;
+    m_month = month;
+    CreateControls();
+}
+void ChangeDateDialog::CreateControls() {
+    wxPanel *pnlTop = createPanel(this);
+
+    wxStaticText *stYear = new wxStaticText(pnlTop, wxID_ANY, "Year");
+    wxStaticText *stMonth = new wxStaticText(pnlTop, wxID_ANY, "Month");
+
+    m_spinYear = new wxSpinCtrl(pnlTop, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1900, 2100, m_year);
+
+    wxArrayString months;
+    wxDateTime dt = wxDateTime(1, wxDateTime::Jan, 2000);
+    for (int i=1; i <= 12; i++) {
+        dt.SetMonth(wxenumMonth(i));
+        months.Add(dt.Format("%B"));
+    }
+    m_chMonth = new wxChoice(pnlTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, months);
+    m_chMonth->SetSelection(m_month-1);
+
+    wxButton *btnOK = createButton(pnlTop, "OK", wxID_OK);
+    wxButton *btnCancel = createButton(pnlTop, "Cancel", wxID_CANCEL);
+
+    wxFlexGridSizer *gs = new wxFlexGridSizer(2, 2, 5, 5);
+    gs->Add(stYear,     0, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(m_spinYear, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(stMonth,    0, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(m_chMonth,  1, wxEXPAND | wxALIGN_CENTER_VERTICAL, 0);
+
+    wxStdDialogButtonSizer *btnbox = new wxStdDialogButtonSizer();
+    btnbox->AddButton(btnOK);
+    btnbox->AddButton(btnCancel);
+    btnbox->Realize();
+
+    wxBoxSizer *vs = createVSizer();
+    vs->Add(gs, 0, wxEXPAND, 0);
+    vs->AddSpacer(10);
+    vs->Add(btnbox, 0, wxEXPAND, 0);
+    pnlTop->SetSizer(vs);
+
+    vs = createVSizer();
+    vs->Add(pnlTop, 0, wxEXPAND | wxALL, 10);
+    SetSizerAndFit(vs);
+}
+
+bool ChangeDateDialog::TransferDataFromWindow() {
+    return true;
 }
 

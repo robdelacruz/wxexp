@@ -1,0 +1,32 @@
+//    SetBackgroundColour(wxColour(0x1f,0x29,0x37));
+//    SetForegroundColour(wxColour(0xe5,0xe7,0xeb));
+//    SetColorsFromParent(pnl);
+//    SetColorsFromParent(ctrlpanel);
+
+//    SetColorsFromParent(lv);
+//    SetColorsFromParent(spinYear);
+//    SetColorsFromParent(chMonth);
+
+//    wxSpinCtrl *spinYear = new wxSpinCtrl(ctrlpanel, ID_EXPENSES_YEAR, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1900, 2100, 2024);
+//    wxArrayString months;
+//    for (int i=1; i <= 12; i++)
+//        months.Add(wxDateTime(date_from_cal(2000, i, 1)).Format("%B"));
+//    wxChoice *chMonth = new wxChoice(ctrlpanel, ID_EXPENSES_MONTH, wxDefaultPosition, wxDefaultSize, months);
+//    int currentmonth;
+//    date_to_cal(date_today(), NULL, &currentmonth, NULL);
+//    chMonth->SetSelection(currentmonth-1);
+
+    wxPanel *ctrlpanel = new wxPanel(pnl, wxID_ANY, wxDefaultPosition, wxDefaultSize);
+    wxArrayString months;
+    for (int i=0; i < 12; i++) {
+        wxString month = (wxDateTime::Now().SetMonth((wxDateTime::Month) (wxDateTime::Jan + i)).Format("%B"));
+        months.Add(month);
+    }
+    wxChoice *chMonth = new wxChoice(ctrlpanel, ID_EXPENSES_MONTH, wxDefaultPosition, wxDefaultSize, months);
+    chMonth->SetSelection(wxDateTime::Now().GetMonth() - wxDateTime::Jan);
+
+    wxBoxSizer *hb = new wxBoxSizer(wxHORIZONTAL);
+    hb->Add(new wxStaticText(ctrlpanel, wxID_ANY, "Month:"), 0, wxALIGN_CENTER, 0);
+    hb->Add(chMonth, 0, wxALIGN_CENTER, 0);
+    ctrlpanel->SetSizer(hb);
+
