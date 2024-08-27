@@ -27,6 +27,7 @@ struct Expense {
     string catname;
 };
 
+const char *db_strerror(int errnum);
 int file_exists(const char *file);
 int create_expense_file(const char *dbfile, sqlite3 **pdb);
 int open_expense_file(const char *dbfile, sqlite3 **pdb);

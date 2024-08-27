@@ -10,16 +10,16 @@
 bool ExpApp::OnInit() {
     ExpFrame *w = new ExpFrame("Expense Buddy GUI");
     w->Show(true);
+
+    if (argc > 1)
+        w->OpenExpenseFile(argv[1]);
+
     return true;
 }
 
 ExpFrame::ExpFrame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(400,480)) {
     setlocale(LC_NUMERIC, "");
     setFontSize(this, 10);
-
-    int z = open_expense_file("rob.db", &db);
-    if (z != 0)
-        quit("Expense file not found.");
 
     wxDateTime today = wxDateTime::Now();
     selYear = today.GetYear();
@@ -86,15 +86,35 @@ void ExpFrame::CreateControls() {
 }
 
 void ExpFrame::RefreshControls() {
+    wxPanel *pnlTop = (wxPanel *) wxWindow::FindWindowById(ID_EXPENSES_PANEL, this);
+    assert(pnlTop != NULL);
+
+    wxMenuBar *mb = GetMenuBar();
+    assert(mb != NULL);
+
+    // If no open file
+    if (db == NULL) {
+        // Hide all content
+        pnlTop->Hide();
+
+        // Disable View menu
+        mb->EnableTop(1, false);
+        return;
+    }
+
+    pnlTop->Show();
+    mb->EnableTop(1, true);
+
     wxStaticText *stExpensesCaption = (wxStaticText *) wxWindow::FindWindowById(ID_EXPENSES_CAPTION, this);
     assert(stExpensesCaption != NULL);
     wxDateTime selDate = wxDateTime(1, wxenumMonth(selMonth), selYear);
-    stExpensesCaption->SetLabelText(selDate.Format("%B, %Y"));
+    stExpensesCaption->SetLabelText(selDate.Format("%B %Y"));
 
     FitListView *lv = (FitListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
     assert(lv != NULL);
 
-    SelectExpensesByMonth(db, 2024, 6, xps);
+    SelectExpensesByMonth(db, selYear, selMonth, xps);
+    lv->DeleteAllItems();
     for (int i=0; i < (int) xps.size(); i++) {
         Expense xp = xps[i];
         lv->InsertItem(i, wxDateTime(xp.date).Format("%m-%d"));
@@ -112,14 +132,61 @@ void ExpFrame::RefreshControls() {
         lv->SetItemState(0, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
         lv->EnsureVisible(0);
     }
+
+    pnlTop->Layout();
 }
 
+void ExpFrame::OnFileNew(wxCommandEvent& e) {
+    wxFileDialog dlg(this, "New Expense File", wxEmptyString, wxEmptyString, wxFileSelectorDefaultWildcardStr, wxFD_SAVE);
+    if (dlg.ShowModal() == wxID_CANCEL)
+        return;
+
+    wxCharBuffer buf = dlg.GetPath().ToUTF8();
+    int z = create_expense_file(buf.data(), &db);
+    if (z != 0) {
+        wxMessageDialog d(NULL, wxString::Format("%s: %s", db_strerror(z), buf.data()), "Error", wxOK|wxICON_ERROR);
+        d.ShowModal();
+        return;
+    }
+
+    wxDateTime today = wxDateTime::Now();
+    selYear = today.GetYear();
+    selMonth = today.GetMonth() - wxDateTime::Jan + 1;
+
+    RefreshControls();
+}
+void ExpFrame::OpenExpenseFile(const wxString& expfile) {
+    wxCharBuffer buf = expfile.ToUTF8();
+    int z = open_expense_file(buf.data(), &db);
+    if (z != 0) {
+        wxMessageDialog d(NULL, wxString::Format("%s: %s", db_strerror(z), buf.data()), "Error", wxOK|wxICON_ERROR);
+        d.ShowModal();
+        return;
+    }
+
+    wxDateTime today = wxDateTime::Now();
+    selYear = today.GetYear();
+    selMonth = today.GetMonth() - wxDateTime::Jan + 1;
+
+    RefreshControls();
+}
+void ExpFrame::OnFileOpen(wxCommandEvent& e) {
+    wxFileDialog dlg(this, "Open Expense File", wxEmptyString, wxEmptyString, "*.db", wxFD_OPEN);
+    if (dlg.ShowModal() == wxID_CANCEL)
+        return;
+    OpenExpenseFile(dlg.GetPath());
+}
 void ExpFrame::OnFileExit(wxCommandEvent& e) {
     Close(true);
 }
 void ExpFrame::OnChangeDate(wxCommandEvent& e) {
     ChangeDateDialog dlg(this, selYear, selMonth);
-    dlg.ShowModal();
+    if (dlg.ShowModal() != wxID_OK)
+        return;
+
+    selYear = dlg.m_year;
+    selMonth = dlg.m_month;
+    RefreshControls();
 }
 
 void ExpFrame::OnExpenseActivated(wxListEvent& e) {
@@ -154,8 +221,8 @@ void ChangeDateDialog::CreateControls() {
     m_chMonth = new wxChoice(pnlTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, months);
     m_chMonth->SetSelection(m_month-1);
 
-    wxButton *btnOK = createButton(pnlTop, "OK", wxID_OK);
-    wxButton *btnCancel = createButton(pnlTop, "Cancel", wxID_CANCEL);
+    wxButton *btnOK = new wxButton(pnlTop, wxID_OK);
+    wxButton *btnCancel = new wxButton(pnlTop, wxID_CANCEL);
 
     wxFlexGridSizer *gs = new wxFlexGridSizer(2, 2, 5, 5);
     gs->Add(stYear,     0, wxALIGN_CENTER_VERTICAL, 0);
@@ -180,6 +247,9 @@ void ChangeDateDialog::CreateControls() {
 }
 
 bool ChangeDateDialog::TransferDataFromWindow() {
+    m_month = m_chMonth->GetSelection()+1;
+    m_year = m_spinYear->GetValue();
+
     return true;
 }
 

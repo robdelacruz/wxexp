@@ -12,6 +12,22 @@
 #include "db.h"
 using namespace std;
 
+const char *db_strerror(int errnum) {
+    if (errnum == 0)
+        return "OK";
+    if (errnum > 0 && errnum <= SQLITE_DONE)
+        return "sqlite3 error";
+    if (errnum == DB_FILE_EXISTS)
+        return "File exists";
+    if (errnum == DB_FILE_NOT_FOUND)
+        return "File not found";
+    if (errnum == DB_MKSTEMP_ERR)
+        return "Error creating temp file";
+    if (errnum == DB_NOT_EXPFILE)
+        return "Not an expense file";
+    return "Unknown error";
+}
+
 static void db_print_err(sqlite3 *db, const char *sql) {
     fprintf(stderr, "SQL: %s\nError: %s\n", sql, sqlite3_errmsg(db));
 }
@@ -102,6 +118,8 @@ int create_expense_file(const char *dbfile, sqlite3 **pdb) {
         sqlite3_close_v2(db);
         return z;
     }
+
+    fprintf(stderr, "Created dbfile '%s'\n", dbfile);
     return 0;
 }
 
