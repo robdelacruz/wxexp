@@ -5,6 +5,11 @@
 #include <vector>
 #include "sqlite3/sqlite3.h"
 #include "wx/wx.h"
+#include "wx/valgen.h"
+#include "wx/valnum.h"
+#include "wx/datectrl.h"
+
+using namespace std;
 
 enum {
     ID_START = wxID_HIGHEST,
@@ -20,10 +25,10 @@ enum {
 
 class ExpFrame : public wxFrame {
 private:
-    sqlite3 *db = NULL;
-    int selYear = 0;
-    int selMonth = 0;
-    vector<Expense> xps;
+    sqlite3 *m_db = NULL;
+    int m_selYear = 0;
+    int m_selMonth = 0;
+    vector<Expense> m_xps;
 
     wxDECLARE_EVENT_TABLE();
 
@@ -56,17 +61,5 @@ wxBEGIN_EVENT_TABLE(ExpFrame, wxFrame)
     EVT_BUTTON(ID_EXPENSES_CHANGEDATE, ExpFrame::OnChangeDate)
     EVT_LIST_ITEM_ACTIVATED(ID_EXPENSES_LISTVIEW, ExpFrame::OnExpenseActivated)
 wxEND_EVENT_TABLE()
-
-class ChangeDateDialog : public wxDialog {
-public:
-    int m_year;
-    int m_month;
-    ChangeDateDialog(wxWindow *parent, int year, int month);
-private:
-    wxSpinCtrl *m_spinYear;
-    wxChoice *m_chMonth;
-    void CreateControls();
-    bool TransferDataFromWindow();
-};
 
 #endif

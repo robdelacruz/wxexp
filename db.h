@@ -33,5 +33,7 @@ int create_expense_file(const char *dbfile, sqlite3 **pdb);
 int open_expense_file(const char *dbfile, sqlite3 **pdb);
 
 int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps);
+int SelectCategories(sqlite3 *db, vector<Category>& cats);
+int UpdateExpense(sqlite3 *db, const Expense& xp);
 
 #endif

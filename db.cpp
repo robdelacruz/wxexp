@@ -190,3 +190,60 @@ int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps
     return 0;
 }
 
+int SelectCategories(sqlite3 *db, vector<Category>& cats) {
+    Category cat;
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    s = "SELECT cat_id, name FROM cat ORDER BY name";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+
+    cats.clear();
+    while ((z = sqlite3_step(stmt)) == SQLITE_ROW) {
+        cat.catid = sqlite3_column_int64(stmt, 0);
+        cat.name = (const char *) sqlite3_column_text(stmt, 1);
+        cats.push_back(cat);
+    }
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
+    return 0;
+}
+
+int UpdateExpense(sqlite3 *db, const Expense& xp) {
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    s = "UPDATE exp SET date = ?, desc = ?, amt = ?, cat_id = ? WHERE exp_id = ?";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_int(stmt, 1, xp.date);
+    assert(z == 0);
+    z = sqlite3_bind_text(stmt, 2, xp.desc.c_str(), -1, NULL);
+    assert(z == 0);
+    z = sqlite3_bind_double(stmt, 3, xp.amt);
+    assert(z == 0);
+    z = sqlite3_bind_int(stmt, 4, xp.catid);
+    assert(z == 0);
+    z = sqlite3_bind_int(stmt, 5, xp.expid);
+    assert(z == 0);
+
+    z = sqlite3_step(stmt);
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
+    return 0;
+}
