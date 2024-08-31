@@ -195,27 +195,19 @@ void ExpFrame::OnExpenseActivated(wxListEvent& e) {
     if (ixps > (int) m_xps.size()-1)
         return;
     Expense& xp = m_xps[ixps];
-    uint64_t expid = xp.expid;
 
     EditExpenseDialog dlg(this, m_db, xp);
     if (dlg.ShowModal() == wxID_CANCEL)
         return;
 
     UpdateExpense(m_db, xp);
-    RefreshControls();
 
-    // Restore previous row selection.
-    FitListView *lv = (FitListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
+    wxListView *lv = (wxListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
     assert(lv != NULL);
-    lv->SetItemState(0, 0, wxLIST_STATE_SELECTED);
 
-    for (int i=0; i < lv->GetItemCount(); i++) {
-        Expense& lvxp = m_xps[i];
-        if (lvxp.expid == expid) {
-            lv->SetItemState(i, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
-            lv->EnsureVisible(i);
-            break;
-        }
-    }
+    lv->SetItem(ixps, 0, wxDateTime(xp.date).Format("%m-%d"));
+    lv->SetItem(ixps, 1, xp.desc);
+    lv->SetItem(ixps, 2, wxString::Format("%'9.2f", xp.amt));
+    lv->SetItem(ixps, 3, xp.catname);
 }
 
