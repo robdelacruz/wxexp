@@ -55,8 +55,20 @@ void ExpFrame::CreateControls() {
     wxPanel *pnlTop = createPanel(this, ID_EXPENSES_PANEL);
     wxPanel *pnlHead = createPanel(pnlTop);
 
-    wxStaticText *st = new wxStaticText(pnlHead, ID_EXPENSES_CAPTION, "Expenses"); 
-    wxButton *btnChangeDate = createButton(pnlHead, "Change", ID_EXPENSES_CHANGEDATE);
+    int w,h;
+
+    GetTextExtent("September", &w, &h);
+    wxStaticText *stMonth = new wxStaticText(pnlHead, ID_EXPENSES_MONTH, "Month", wxDefaultPosition, wxSize(w+8,h), wxALIGN_CENTRE_HORIZONTAL|wxST_NO_AUTORESIZE);
+    stMonth->SetBackgroundColour(wxColour(0xff,0xff,0xff));
+
+    GetTextExtent("9999", &w, &h);
+    wxStaticText *stYear = new wxStaticText(pnlHead, ID_EXPENSES_YEAR, "Year", wxDefaultPosition, wxSize(w+8,h), wxALIGN_CENTRE_HORIZONTAL|wxST_NO_AUTORESIZE);
+    stYear->SetBackgroundColour(wxColour(0xff,0xff,0xff));
+
+    wxButton *btnPrevMonth = new wxButton(pnlHead, ID_EXPENSES_PREVMONTH, "<", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
+    wxButton *btnNextMonth = new wxButton(pnlHead, ID_EXPENSES_NEXTMONTH, ">", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
+    wxButton *btnPrevYear = new wxButton(pnlHead, ID_EXPENSES_PREVYEAR, "<", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
+    wxButton *btnNextYear = new wxButton(pnlHead, ID_EXPENSES_NEXTYEAR, ">", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
 
     FitListView *lv = new FitListView(pnlTop, ID_EXPENSES_LISTVIEW);
     lv->AppendColumn("Date");
@@ -69,9 +81,13 @@ void ExpFrame::CreateControls() {
     lv->SetColumnWidth(3, wxLIST_AUTOSIZE_USEHEADER);
 
     wxBoxSizer *hs = createHSizer();
-    hs->Add(st, 0, wxALIGN_CENTER, 0);
-    hs->AddSpacer(8);
-    hs->Add(btnChangeDate, 0, wxALIGN_CENTER, 0);
+    hs->Add(btnPrevMonth, 0, wxALIGN_CENTER, 0);
+    hs->Add(stMonth, 0, wxALIGN_CENTER, 0);
+    hs->Add(btnNextMonth, 0, wxALIGN_CENTER, 0);
+    hs->AddSpacer(5);
+    hs->Add(btnPrevYear, 0, wxALIGN_CENTER, 0);
+    hs->Add(stYear, 0, wxALIGN_CENTER, 0);
+    hs->Add(btnNextYear, 0, wxALIGN_CENTER, 0);
     pnlHead->SetSizer(hs);
 
     wxBoxSizer *vs = createVSizer();
@@ -105,10 +121,13 @@ void ExpFrame::RefreshControls() {
     pnlTop->Show();
     mb->EnableTop(1, true);
 
-    wxStaticText *stExpensesCaption = (wxStaticText *) wxWindow::FindWindowById(ID_EXPENSES_CAPTION, this);
-    assert(stExpensesCaption != NULL);
+    wxStaticText *stMonth = (wxStaticText *) wxWindow::FindWindowById(ID_EXPENSES_MONTH, this);
+    wxStaticText *stYear = (wxStaticText *) wxWindow::FindWindowById(ID_EXPENSES_YEAR, this);
+    assert(stMonth != NULL);
+    assert(stYear != NULL);
     wxDateTime selDate = wxDateTime(1, wxenumMonth(m_selMonth), m_selYear);
-    stExpensesCaption->SetLabelText(selDate.Format("%B %Y"));
+    stMonth->SetLabel(selDate.Format("%B"));
+    stYear->SetLabel(selDate.Format("%Y"));
 
     FitListView *lv = (FitListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
     assert(lv != NULL);
@@ -124,10 +143,10 @@ void ExpFrame::RefreshControls() {
         lv->SetItemData(i, i);
     }
     if (lv->GetItemCount() > 0) {
-        lv->SetColumnWidth(0, -1);
-        lv->SetColumnWidth(1, -1);
-        lv->SetColumnWidth(2, -1);
-        lv->SetColumnWidth(3, -1);
+//        lv->SetColumnWidth(0, -1);
+//        lv->SetColumnWidth(1, -1);
+//        lv->SetColumnWidth(2, -1);
+//        lv->SetColumnWidth(3, -1);
 
         lv->SetItemState(0, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
         lv->EnsureVisible(0);
@@ -179,13 +198,29 @@ void ExpFrame::OnFileOpen(wxCommandEvent& e) {
 void ExpFrame::OnFileExit(wxCommandEvent& e) {
     Close(true);
 }
-void ExpFrame::OnChangeDate(wxCommandEvent& e) {
-    ChangeDateDialog dlg(this, m_selYear, m_selMonth);
-    if (dlg.ShowModal() != wxID_OK)
-        return;
 
-    m_selYear = dlg.m_year;
-    m_selMonth = dlg.m_month;
+void ExpFrame::OnPrevMonth(wxCommandEvent& e) {
+    m_selMonth--;
+    if (m_selMonth <= 0) {
+        m_selYear--;
+        m_selMonth = 12;
+    }
+    RefreshControls();
+}
+void ExpFrame::OnNextMonth(wxCommandEvent& e) {
+    m_selMonth++;
+    if (m_selMonth > 12) {
+        m_selYear++;
+        m_selMonth = 1;
+    }
+    RefreshControls();
+}
+void ExpFrame::OnPrevYear(wxCommandEvent& e) {
+    m_selYear--;
+    RefreshControls();
+}
+void ExpFrame::OnNextYear(wxCommandEvent& e) {
+    m_selYear++;
     RefreshControls();
 }
 
