@@ -44,3 +44,6 @@ https://docs.wxwidgets.org/latest/overview_propgrid.html
 // resize listview columns when EVT_SIZE occured:
 https://forums.wxwidgets.org/viewtopic.php?t=8700
 
+// key events:
+https://wiki.wxwidgets.org/Catching_key_events_globally
+

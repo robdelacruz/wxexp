@@ -12,6 +12,7 @@ wxButton *createButton(wxWindow *parent, const wxString& label=wxEmptyString, wx
 
 void setColorsFromParent(wxWindow *w);
 void setFontSize(wxWindow *w, int pointSize);
+void selectFirstListViewRow(wxListView *lv);
 
 class FitListView : public wxListView {
 public:

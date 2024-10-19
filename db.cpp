@@ -279,3 +279,25 @@ int UpdateExpense(sqlite3 *db, const Expense& xp) {
     sqlite3_finalize(stmt);
     return 0;
 }
+int DelExpense(sqlite3 *db, const Expense& xp) {
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    s = "DELETE FROM exp WHERE exp_id = ?";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_int(stmt, 1, xp.expid);
+    assert(z == 0);
+
+    z = sqlite3_step(stmt);
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
+    return 0;
+}

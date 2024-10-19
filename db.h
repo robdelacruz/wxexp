@@ -36,5 +36,6 @@ int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps
 int SelectCategories(sqlite3 *db, vector<Category>& cats);
 int AddExpense(sqlite3 *db, Expense& xp);
 int UpdateExpense(sqlite3 *db, const Expense& xp);
+int DelExpense(sqlite3 *db, const Expense& xp);
 
 #endif

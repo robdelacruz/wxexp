@@ -33,6 +33,13 @@ void setFontSize(wxWindow *w, int pointSize) {
     w->SetFont(font);
 }
 
+void selectFirstListViewRow(wxListView *lv) {
+    if (lv->GetItemCount() > 0) {
+        lv->SetItemState(0, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+        lv->EnsureVisible(0);
+    }
+}
+
 wxBEGIN_EVENT_TABLE(FitListView, wxListView)
     EVT_SIZE(FitListView::OnSize)
 wxEND_EVENT_TABLE()

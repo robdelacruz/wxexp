@@ -14,6 +14,9 @@ enum {
     ID_VIEW_EXP,
     ID_VIEW_CAT,
     ID_VIEW_YTD,
+    ID_EXPENSE_NEW,
+    ID_EXPENSE_EDIT,
+    ID_EXPENSE_DEL,
     ID_EXPENSES_PANEL,
     ID_EXPENSES_MONTH,
     ID_EXPENSES_YEAR,
@@ -21,7 +24,6 @@ enum {
     ID_EXPENSES_NEXTMONTH,
     ID_EXPENSES_PREVYEAR,
     ID_EXPENSES_NEXTYEAR,
-    ID_EXPENSES_NEW,
     ID_EXPENSES_LISTVIEW,
     ID_COUNT
 };
@@ -32,6 +34,7 @@ private:
     int m_selYear = 0;
     int m_selMonth = 0;
     vector<Expense> m_xps;
+    FitListView *m_lv = NULL;
 
     wxDECLARE_EVENT_TABLE();
 
@@ -47,12 +50,18 @@ public:
     void OnFileNew(wxCommandEvent& event);
     void OnFileOpen(wxCommandEvent& event);
     void OnFileExit(wxCommandEvent& event);
+    void OnExpenseNew(wxCommandEvent& event);
+    void OnExpenseEdit(wxCommandEvent& event);
+    void OnExpenseDel(wxCommandEvent& event);
+
     void OnPrevMonth(wxCommandEvent& event);
     void OnNextMonth(wxCommandEvent& event);
     void OnPrevYear(wxCommandEvent& event);
     void OnNextYear(wxCommandEvent& event);
-    void OnNewExpense(wxCommandEvent& e);
     void OnExpenseActivated(wxListEvent& e);
+
+    void EditExpenseRow(int ixps);
+    void DelExpenseRow(int ixps);
 };
 
 class ExpApp : public wxApp {
@@ -65,11 +74,14 @@ wxBEGIN_EVENT_TABLE(ExpFrame, wxFrame)
     EVT_MENU(wxID_NEW, ExpFrame::OnFileNew)
     EVT_MENU(wxID_OPEN, ExpFrame::OnFileOpen)
     EVT_MENU(wxID_EXIT, ExpFrame::OnFileExit)
+    EVT_MENU(ID_EXPENSE_NEW, ExpFrame::OnExpenseNew)
+    EVT_MENU(ID_EXPENSE_EDIT, ExpFrame::OnExpenseEdit)
+    EVT_MENU(ID_EXPENSE_DEL, ExpFrame::OnExpenseDel)
     EVT_BUTTON(ID_EXPENSES_PREVMONTH, ExpFrame::OnPrevMonth)
     EVT_BUTTON(ID_EXPENSES_NEXTMONTH, ExpFrame::OnNextMonth)
     EVT_BUTTON(ID_EXPENSES_PREVYEAR, ExpFrame::OnPrevYear)
     EVT_BUTTON(ID_EXPENSES_NEXTYEAR, ExpFrame::OnNextYear)
-    EVT_BUTTON(ID_EXPENSES_NEW, ExpFrame::OnNewExpense)
+    EVT_BUTTON(ID_EXPENSE_NEW, ExpFrame::OnExpenseNew)
     EVT_LIST_ITEM_ACTIVATED(ID_EXPENSES_LISTVIEW, ExpFrame::OnExpenseActivated)
 wxEND_EVENT_TABLE()
 
@@ -112,6 +124,7 @@ ExpFrame::ExpFrame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDef
     CreateMenu();
     CreateControls();
     RefreshControls();
+    selectFirstListViewRow(m_lv);
 
 }
 ExpFrame::~ExpFrame() {
@@ -131,6 +144,12 @@ void ExpFrame::CreateMenu() {
     menu->AppendRadioItem(ID_VIEW_CAT, "&Category Totals\tCtrl-2", "View Category Totals");
     menu->AppendRadioItem(ID_VIEW_YTD, "&Year To Date\tCtrl-3", "View Year To Date");
     mb->Append(menu, "&View");
+
+    menu = new wxMenu();
+    menu->Append(ID_EXPENSE_NEW, "&New\tCtrl-N", "New Expense");
+    menu->Append(ID_EXPENSE_EDIT, "&Edit\tCtrl-E", "Edit Expense");
+    menu->Append(ID_EXPENSE_DEL, "&Delete\tCtrl-X", "Delete Expense");
+    mb->Append(menu, "&Expense");
 
     SetMenuBar(mb);
 }
@@ -153,17 +172,17 @@ void ExpFrame::CreateControls() {
     wxButton *btnNextMonth = new wxButton(pnlHead, ID_EXPENSES_NEXTMONTH, ">", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
     wxButton *btnPrevYear = new wxButton(pnlHead, ID_EXPENSES_PREVYEAR, "<", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
     wxButton *btnNextYear = new wxButton(pnlHead, ID_EXPENSES_NEXTYEAR, ">", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
-    wxButton *btnNew = createButton(pnlHead, "New", ID_EXPENSES_NEW);
+    wxButton *btnNew = createButton(pnlHead, "New", ID_EXPENSE_NEW);
 
-    FitListView *lv = new FitListView(pnlTop, ID_EXPENSES_LISTVIEW);
-    lv->AppendColumn("Date");
-    lv->AppendColumn("Description");
-    lv->AppendColumn("Amount");
-    lv->AppendColumn("Category");
-    lv->SetColumnWidth(0, wxLIST_AUTOSIZE_USEHEADER);
-    lv->SetColumnWidth(1, 150);
-    lv->SetColumnWidth(2, wxLIST_AUTOSIZE_USEHEADER);
-    lv->SetColumnWidth(3, wxLIST_AUTOSIZE_USEHEADER);
+    m_lv = new FitListView(pnlTop, ID_EXPENSES_LISTVIEW);
+    m_lv->AppendColumn("Date");
+    m_lv->AppendColumn("Description");
+    m_lv->AppendColumn("Amount");
+    m_lv->AppendColumn("Category");
+    m_lv->SetColumnWidth(0, wxLIST_AUTOSIZE_USEHEADER);
+    m_lv->SetColumnWidth(1, 150);
+    m_lv->SetColumnWidth(2, wxLIST_AUTOSIZE_USEHEADER);
+    m_lv->SetColumnWidth(3, wxLIST_AUTOSIZE_USEHEADER);
 
     wxBoxSizer *hs = createHSizer();
     hs->Add(btnPrevMonth, 0, wxALIGN_CENTER, 0);
@@ -180,7 +199,7 @@ void ExpFrame::CreateControls() {
     wxBoxSizer *vs = createVSizer();
     vs->Add(pnlHead, 0, wxEXPAND, 0);
     vs->AddSpacer(5);
-    vs->Add(lv, 1, wxEXPAND, 0);
+    vs->Add(m_lv, 1, wxEXPAND, 0);
     pnlTop->SetSizer(vs);
 
     vs = createVSizer();
@@ -216,27 +235,15 @@ void ExpFrame::RefreshControls() {
     stMonth->SetLabel(selDate.Format("%B"));
     stYear->SetLabel(selDate.Format("%Y"));
 
-    FitListView *lv = (FitListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
-    assert(lv != NULL);
-
     SelectExpensesByMonth(m_db, m_selYear, m_selMonth, m_xps);
-    lv->DeleteAllItems();
+    m_lv->DeleteAllItems();
     for (int i=0; i < (int) m_xps.size(); i++) {
         Expense& xp = m_xps[i];
-        lv->InsertItem(i, wxDateTime(xp.date).Format("%m-%d"));
-        lv->SetItem(i, 1, xp.desc);
-        lv->SetItem(i, 2, wxString::Format("%'9.2f", xp.amt));
-        lv->SetItem(i, 3, xp.catname);
-        lv->SetItemData(i, i);
-    }
-    if (lv->GetItemCount() > 0) {
-//        lv->SetColumnWidth(0, -1);
-//        lv->SetColumnWidth(1, -1);
-//        lv->SetColumnWidth(2, -1);
-//        lv->SetColumnWidth(3, -1);
-
-        lv->SetItemState(0, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
-        lv->EnsureVisible(0);
+        m_lv->InsertItem(i, wxDateTime(xp.date).Format("%m-%d"));
+        m_lv->SetItem(i, 1, xp.desc);
+        m_lv->SetItem(i, 2, wxString::Format("%'9.2f", xp.amt));
+        m_lv->SetItem(i, 3, xp.catname);
+        m_lv->SetItemData(i, i);
     }
 
     pnlTop->Layout();
@@ -260,6 +267,7 @@ void ExpFrame::OnFileNew(wxCommandEvent& e) {
     m_selMonth = today.GetMonth() - wxDateTime::Jan + 1;
 
     RefreshControls();
+    selectFirstListViewRow(m_lv);
 }
 void ExpFrame::OpenExpenseFile(const wxString& expfile) {
     wxCharBuffer buf = expfile.ToUTF8();
@@ -275,6 +283,7 @@ void ExpFrame::OpenExpenseFile(const wxString& expfile) {
     m_selMonth = today.GetMonth() - wxDateTime::Jan + 1;
 
     RefreshControls();
+    selectFirstListViewRow(m_lv);
 }
 void ExpFrame::OnFileOpen(wxCommandEvent& e) {
     wxFileDialog dlg(this, "Open Expense File", wxEmptyString, wxEmptyString, "*.db", wxFD_OPEN);
@@ -285,32 +294,7 @@ void ExpFrame::OnFileOpen(wxCommandEvent& e) {
 void ExpFrame::OnFileExit(wxCommandEvent& e) {
     Close(true);
 }
-
-void ExpFrame::OnPrevMonth(wxCommandEvent& e) {
-    m_selMonth--;
-    if (m_selMonth <= 0) {
-        m_selYear--;
-        m_selMonth = 12;
-    }
-    RefreshControls();
-}
-void ExpFrame::OnNextMonth(wxCommandEvent& e) {
-    m_selMonth++;
-    if (m_selMonth > 12) {
-        m_selYear++;
-        m_selMonth = 1;
-    }
-    RefreshControls();
-}
-void ExpFrame::OnPrevYear(wxCommandEvent& e) {
-    m_selYear--;
-    RefreshControls();
-}
-void ExpFrame::OnNextYear(wxCommandEvent& e) {
-    m_selYear++;
-    RefreshControls();
-}
-void ExpFrame::OnNewExpense(wxCommandEvent& e) {
+void ExpFrame::OnExpenseNew(wxCommandEvent& event) {
     Expense xp;
     xp.expid = 0;
     xp.date = date_today();
@@ -328,15 +312,56 @@ void ExpFrame::OnNewExpense(wxCommandEvent& e) {
     RefreshControls();
 
     // Select the newly added expense.
-    FitListView *lv = (FitListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
-    assert(lv != NULL);
     for (int i=0; i < (int) m_xps.size(); i++) {
         if (xp.expid == m_xps[i].expid) {
-            lv->SetItemState(i, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
-            lv->EnsureVisible(i);
+            m_lv->SetItemState(i, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+            m_lv->EnsureVisible(i);
             break;
         }
     }
+}
+void ExpFrame::OnExpenseEdit(wxCommandEvent& event) {
+    long sel = m_lv->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+    if (sel == -1)
+        return;
+    int ixps = (int) m_lv->GetItemData(sel);
+    EditExpenseRow(ixps);
+}
+void ExpFrame::OnExpenseDel(wxCommandEvent& event) {
+    long sel = m_lv->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+    if (sel == -1)
+        return;
+    int ixps = (int) m_lv->GetItemData(sel);
+    DelExpenseRow(ixps);
+}
+
+void ExpFrame::OnPrevMonth(wxCommandEvent& e) {
+    m_selMonth--;
+    if (m_selMonth <= 0) {
+        m_selYear--;
+        m_selMonth = 12;
+    }
+    RefreshControls();
+    selectFirstListViewRow(m_lv);
+}
+void ExpFrame::OnNextMonth(wxCommandEvent& e) {
+    m_selMonth++;
+    if (m_selMonth > 12) {
+        m_selYear++;
+        m_selMonth = 1;
+    }
+    RefreshControls();
+    selectFirstListViewRow(m_lv);
+}
+void ExpFrame::OnPrevYear(wxCommandEvent& e) {
+    m_selYear--;
+    RefreshControls();
+    selectFirstListViewRow(m_lv);
+}
+void ExpFrame::OnNextYear(wxCommandEvent& e) {
+    m_selYear++;
+    RefreshControls();
+    selectFirstListViewRow(m_lv);
 }
 
 void ExpFrame::OnExpenseActivated(wxListEvent& e) {
@@ -344,21 +369,40 @@ void ExpFrame::OnExpenseActivated(wxListEvent& e) {
     int ixps = (int) li.GetData();
     if (ixps > (int) m_xps.size()-1)
         return;
-    Expense& xp = m_xps[ixps];
+    EditExpenseRow(ixps);
+}
 
+void ExpFrame::EditExpenseRow(int ixps) {
+    Expense& xp = m_xps[ixps];
     EditExpenseDialog dlg(this, m_db, xp);
     if (dlg.ShowModal() == wxID_CANCEL)
         return;
 
     UpdateExpense(m_db, xp);
 
-    wxListView *lv = (wxListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
-    assert(lv != NULL);
+    m_lv->SetItem(ixps, 0, wxDateTime(xp.date).Format("%m-%d"));
+    m_lv->SetItem(ixps, 1, xp.desc);
+    m_lv->SetItem(ixps, 2, wxString::Format("%'9.2f", xp.amt));
+    m_lv->SetItem(ixps, 3, xp.catname);
+}
+void ExpFrame::DelExpenseRow(int ixps) {
+    Expense& xp = m_xps[ixps];
 
-    lv->SetItem(ixps, 0, wxDateTime(xp.date).Format("%m-%d"));
-    lv->SetItem(ixps, 1, xp.desc);
-    lv->SetItem(ixps, 2, wxString::Format("%'9.2f", xp.amt));
-    lv->SetItem(ixps, 3, xp.catname);
+    wxMessageDialog dlg(this, wxString::Format("Delete '%s'?", wxString::FromUTF8(xp.desc)), "Confirm Delete", wxYES_NO | wxNO_DEFAULT); 
+    if (dlg.ShowModal() != wxID_YES)
+        return;
+
+    DelExpense(m_db, xp);
+
+    // Refresh expenses list and select the next expense following the deleted one.
+    RefreshControls();
+    if (m_xps.size() == 0)
+        return;
+    if (ixps >= (int) m_xps.size())
+        ixps = m_xps.size()-1;
+
+    m_lv->SetItemState(ixps, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+    m_lv->EnsureVisible(ixps);
 }
 
 //***
