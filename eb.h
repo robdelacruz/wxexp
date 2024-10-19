@@ -1,15 +1,7 @@
 #ifndef EB_H
 #define EB_H
 
-#include <iostream>
-#include <vector>
-#include "sqlite3/sqlite3.h"
 #include "wx/wx.h"
-#include "wx/valgen.h"
-#include "wx/valnum.h"
-#include "wx/datectrl.h"
-
-using namespace std;
 
 enum {
     ID_START = wxID_HIGHEST,

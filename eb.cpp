@@ -2,10 +2,94 @@
 #include "wx/window.h"
 #include "wx/colour.h"
 #include "wx/listctrl.h"
+#include "wx/datectrl.h"
+#include "wx/valgen.h"
+#include "wx/valnum.h"
+
 #include "db.h"
 #include "wxutil.h"
-#include "eb.h"
-#include "dialogs.h"
+
+enum {
+    ID_START = wxID_HIGHEST,
+    ID_VIEW_EXP,
+    ID_VIEW_CAT,
+    ID_VIEW_YTD,
+    ID_EXPENSES_PANEL,
+    ID_EXPENSES_MONTH,
+    ID_EXPENSES_YEAR,
+    ID_EXPENSES_PREVMONTH,
+    ID_EXPENSES_NEXTMONTH,
+    ID_EXPENSES_PREVYEAR,
+    ID_EXPENSES_NEXTYEAR,
+    ID_EXPENSES_NEW,
+    ID_EXPENSES_LISTVIEW,
+    ID_COUNT
+};
+
+class ExpFrame : public wxFrame {
+private:
+    sqlite3 *m_db = NULL;
+    int m_selYear = 0;
+    int m_selMonth = 0;
+    vector<Expense> m_xps;
+
+    wxDECLARE_EVENT_TABLE();
+
+public:
+    ExpFrame(const wxString& title);
+    ~ExpFrame();
+
+    void CreateMenu();
+    void CreateControls();
+    void RefreshControls();
+    void OpenExpenseFile(const wxString& expfile);
+
+    void OnFileNew(wxCommandEvent& event);
+    void OnFileOpen(wxCommandEvent& event);
+    void OnFileExit(wxCommandEvent& event);
+    void OnPrevMonth(wxCommandEvent& event);
+    void OnNextMonth(wxCommandEvent& event);
+    void OnPrevYear(wxCommandEvent& event);
+    void OnNextYear(wxCommandEvent& event);
+    void OnNewExpense(wxCommandEvent& e);
+    void OnExpenseActivated(wxListEvent& e);
+};
+
+class ExpApp : public wxApp {
+public:
+    virtual bool OnInit();
+};
+wxIMPLEMENT_APP(ExpApp);
+
+wxBEGIN_EVENT_TABLE(ExpFrame, wxFrame)
+    EVT_MENU(wxID_NEW, ExpFrame::OnFileNew)
+    EVT_MENU(wxID_OPEN, ExpFrame::OnFileOpen)
+    EVT_MENU(wxID_EXIT, ExpFrame::OnFileExit)
+    EVT_BUTTON(ID_EXPENSES_PREVMONTH, ExpFrame::OnPrevMonth)
+    EVT_BUTTON(ID_EXPENSES_NEXTMONTH, ExpFrame::OnNextMonth)
+    EVT_BUTTON(ID_EXPENSES_PREVYEAR, ExpFrame::OnPrevYear)
+    EVT_BUTTON(ID_EXPENSES_NEXTYEAR, ExpFrame::OnNextYear)
+    EVT_BUTTON(ID_EXPENSES_NEW, ExpFrame::OnNewExpense)
+    EVT_LIST_ITEM_ACTIVATED(ID_EXPENSES_LISTVIEW, ExpFrame::OnExpenseActivated)
+wxEND_EVENT_TABLE()
+
+class EditExpenseDialog : public wxDialog {
+public:
+    Expense& m_xp;
+
+    EditExpenseDialog(wxWindow *parent, sqlite3 *db, Expense& xp);
+private:
+    sqlite3 *m_db;
+    wxString m_desc;
+    double m_amt;
+    int m_icatsel=wxNOT_FOUND;
+    wxDatePickerCtrl *m_dpDate;
+    vector<Category> m_cats;
+    wxChoice *m_chCat;
+
+    void CreateControls();
+    bool TransferDataFromWindow();
+};
 
 bool ExpApp::OnInit() {
     ExpFrame *w = new ExpFrame("Expense Buddy GUI");
@@ -69,6 +153,7 @@ void ExpFrame::CreateControls() {
     wxButton *btnNextMonth = new wxButton(pnlHead, ID_EXPENSES_NEXTMONTH, ">", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
     wxButton *btnPrevYear = new wxButton(pnlHead, ID_EXPENSES_PREVYEAR, "<", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
     wxButton *btnNextYear = new wxButton(pnlHead, ID_EXPENSES_NEXTYEAR, ">", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
+    wxButton *btnNew = createButton(pnlHead, "New", ID_EXPENSES_NEW);
 
     FitListView *lv = new FitListView(pnlTop, ID_EXPENSES_LISTVIEW);
     lv->AppendColumn("Date");
@@ -88,6 +173,8 @@ void ExpFrame::CreateControls() {
     hs->Add(btnPrevYear, 0, wxALIGN_CENTER, 0);
     hs->Add(stYear, 0, wxALIGN_CENTER, 0);
     hs->Add(btnNextYear, 0, wxALIGN_CENTER, 0);
+    hs->AddStretchSpacer();
+    hs->Add(btnNew, 0, wxALIGN_CENTER, 0);
     pnlHead->SetSizer(hs);
 
     wxBoxSizer *vs = createVSizer();
@@ -135,7 +222,7 @@ void ExpFrame::RefreshControls() {
     SelectExpensesByMonth(m_db, m_selYear, m_selMonth, m_xps);
     lv->DeleteAllItems();
     for (int i=0; i < (int) m_xps.size(); i++) {
-        Expense xp = m_xps[i];
+        Expense& xp = m_xps[i];
         lv->InsertItem(i, wxDateTime(xp.date).Format("%m-%d"));
         lv->SetItem(i, 1, xp.desc);
         lv->SetItem(i, 2, wxString::Format("%'9.2f", xp.amt));
@@ -223,6 +310,34 @@ void ExpFrame::OnNextYear(wxCommandEvent& e) {
     m_selYear++;
     RefreshControls();
 }
+void ExpFrame::OnNewExpense(wxCommandEvent& e) {
+    Expense xp;
+    xp.expid = 0;
+    xp.date = date_today();
+    xp.amt = 0.0;
+    xp.catid = 19;
+
+    EditExpenseDialog dlg(this, m_db, xp);
+    if (dlg.ShowModal() == wxID_CANCEL)
+        return;
+
+    AddExpense(m_db, xp);
+
+    // Refresh expenses list to newly added expense's year and month.
+    date_to_cal(xp.date, &m_selYear, &m_selMonth, NULL);
+    RefreshControls();
+
+    // Select the newly added expense.
+    FitListView *lv = (FitListView *) wxWindow::FindWindowById(ID_EXPENSES_LISTVIEW, this);
+    assert(lv != NULL);
+    for (int i=0; i < (int) m_xps.size(); i++) {
+        if (xp.expid == m_xps[i].expid) {
+            lv->SetItemState(i, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+            lv->EnsureVisible(i);
+            break;
+        }
+    }
+}
 
 void ExpFrame::OnExpenseActivated(wxListEvent& e) {
     wxListItem li = e.GetItem();
@@ -246,3 +361,90 @@ void ExpFrame::OnExpenseActivated(wxListEvent& e) {
     lv->SetItem(ixps, 3, xp.catname);
 }
 
+//***
+//*** EditExpenseDialog
+//***
+EditExpenseDialog::EditExpenseDialog(wxWindow *parent, sqlite3 *db, Expense& xp)
+    : wxDialog(parent, wxID_ANY, "Edit Expense"),
+    m_xp(xp),
+    m_desc(wxString(xp.desc)),
+    m_amt(xp.amt)
+{
+    m_db = db;
+    CreateControls();
+}
+static wxStaticText *createLabel(wxWindow *parent, const wxString& text) {
+    return new wxStaticText(parent, wxID_ANY, text);
+}
+void EditExpenseDialog::CreateControls() {
+    wxPanel *pnlTop = createPanel(this);
+
+    wxStaticText *stDesc = createLabel(pnlTop, "Description");
+    wxStaticText *stAmt = createLabel(pnlTop, "Amount");
+    wxStaticText *stCat = createLabel(pnlTop, "Category");
+    wxStaticText *stDate = createLabel(pnlTop, "Date");
+
+    wxTextCtrl *tcDesc = new wxTextCtrl(pnlTop, wxID_ANY, "", wxDefaultPosition, wxSize(200,-1), 0, wxTextValidator(wxFILTER_NONE, &m_desc));
+    tcDesc->SetMaxLength(30);
+
+    wxFloatingPointValidator<double> vldAmt(2, &m_amt, wxNUM_VAL_ZERO_AS_BLANK|wxNUM_VAL_THOUSANDS_SEPARATOR);
+    wxTextCtrl *tcAmt = new wxTextCtrl(pnlTop, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, 0, vldAmt);
+
+    SelectCategories(m_db, m_cats);
+    wxArrayString acats;
+    for (int i=0; i < (int) m_cats.size(); i++) {
+        Category cat = m_cats[i];
+        acats.Add(cat.name);
+        if (m_xp.catid == cat.catid)
+            m_icatsel = i;
+    }
+    m_chCat = new wxChoice(pnlTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, acats, 0, wxGenericValidator(&m_icatsel));
+    m_chCat->SetSelection(m_icatsel);
+
+    m_dpDate = new wxDatePickerCtrl(pnlTop, wxID_ANY, wxDateTime(m_xp.date), wxDefaultPosition, wxDefaultSize, wxDP_DEFAULT|wxDP_SHOWCENTURY);
+
+    wxButton *btnOK = new wxButton(pnlTop, wxID_OK);
+    wxButton *btnCancel = new wxButton(pnlTop, wxID_CANCEL);
+
+    wxFlexGridSizer *gs = new wxFlexGridSizer(4, 2, 5, 5);
+    gs->Add(stDesc,   0, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(tcDesc,   1, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(stAmt,    0, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(tcAmt,    1, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(stCat,    0, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(m_chCat,  1, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(stDate,   0, wxALIGN_CENTER_VERTICAL, 0);
+    gs->Add(m_dpDate, 1, wxALIGN_CENTER_VERTICAL, 0);
+
+    wxStdDialogButtonSizer *btnbox = new wxStdDialogButtonSizer();
+    btnbox->AddButton(btnOK);
+    btnbox->AddButton(btnCancel);
+    btnbox->Realize();
+
+    wxBoxSizer *vs = createVSizer();
+    vs->Add(gs, 0, wxEXPAND, 0);
+    vs->AddSpacer(10);
+    vs->Add(btnbox, 0, wxEXPAND, 0);
+    pnlTop->SetSizer(vs);
+
+    vs = createVSizer();
+    vs->Add(pnlTop, 0, wxEXPAND | wxALL, 10);
+    SetSizerAndFit(vs);
+}
+bool EditExpenseDialog::TransferDataFromWindow() {
+    wxDialog::TransferDataFromWindow();
+
+    if (m_icatsel < 0)
+        return false;
+    if (m_desc.Length() == 0)
+        return false;
+
+    m_xp.desc = m_desc;
+    m_xp.amt = m_amt;
+
+    assert(m_icatsel >= 0 && m_icatsel < (int) m_cats.size());
+    m_xp.catid = m_cats[m_icatsel].catid;
+    m_xp.date = m_dpDate->GetValue().GetTicks();
+
+    return true;
+}
