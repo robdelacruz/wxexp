@@ -379,6 +379,7 @@ void ExpFrame::EditExpenseRow(int ixps) {
         return;
 
     UpdateExpense(m_db, xp);
+    RefreshExpenseCatName(m_db, xp);
 
     m_lv->SetItem(ixps, 0, wxDateTime(xp.date).Format("%m-%d"));
     m_lv->SetItem(ixps, 1, xp.desc);

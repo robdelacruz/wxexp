@@ -148,48 +148,6 @@ int open_expense_file(const char *dbfile, sqlite3 **pdb) {
     return 0;
 }
 
-int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps) {
-    Expense xp;
-    sqlite3_stmt *stmt;
-    const char *s;
-    int z;
-
-    date_t tstart = date_from_cal(year, month, 1);
-    date_t tend = date_next_month(tstart);
-
-    s = "SELECT exp_id, date, desc, amt, exp.cat_id, IFNULL(cat.name, '') "
-        "FROM exp "
-        "LEFT OUTER JOIN cat ON exp.cat_id = cat.cat_id "
-        "WHERE date >= ? AND date < ? "
-        "ORDER BY date DESC ";
-    z = prepare_sql(db, s, &stmt);
-    if (z != 0) {
-        db_handle_err(db, stmt, s);
-        return z;
-    }
-    z = sqlite3_bind_int(stmt, 1, tstart);
-    assert(z == 0);
-    z = sqlite3_bind_int(stmt, 2, tend);
-    assert(z == 0);
-
-    xps.clear();
-    while ((z = sqlite3_step(stmt)) == SQLITE_ROW) {
-        xp.expid = sqlite3_column_int64(stmt, 0);
-        xp.date = sqlite3_column_int(stmt, 1);
-        xp.desc = (const char *) sqlite3_column_text(stmt, 2);
-        xp.amt = sqlite3_column_double(stmt, 3);
-        xp.catid = sqlite3_column_int64(stmt, 4);
-        xp.catname = (const char *) sqlite3_column_text(stmt, 5);
-        xps.push_back(xp);
-    }
-    if (z != SQLITE_DONE) {
-        db_handle_err(db, stmt, s);
-        return z;
-    }
-    sqlite3_finalize(stmt);
-    return 0;
-}
-
 int SelectCategories(sqlite3 *db, vector<Category>& cats) {
     Category cat;
     sqlite3_stmt *stmt;
@@ -202,6 +160,35 @@ int SelectCategories(sqlite3 *db, vector<Category>& cats) {
         db_handle_err(db, stmt, s);
         return z;
     }
+
+    cats.clear();
+    while ((z = sqlite3_step(stmt)) == SQLITE_ROW) {
+        cat.catid = sqlite3_column_int64(stmt, 0);
+        cat.name = (const char *) sqlite3_column_text(stmt, 1);
+        cats.push_back(cat);
+    }
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
+    return 0;
+}
+
+int FindCategoryByID(sqlite3 *db, uint64_t catid, vector<Category>& cats) {
+    Category cat;
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    s = "SELECT cat_id, name FROM cat WHERE cat_id = ?";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_int64(stmt, 1, catid);
+    assert(z == 0);
 
     cats.clear();
     while ((z = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -262,6 +249,48 @@ int AddCategory(sqlite3 *db, Category& cat) {
     sqlite3_finalize(stmt);
 
     cat.catid = sqlite3_last_insert_rowid(db);
+    return 0;
+}
+
+int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps) {
+    Expense xp;
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    date_t tstart = date_from_cal(year, month, 1);
+    date_t tend = date_next_month(tstart);
+
+    s = "SELECT exp_id, date, desc, amt, exp.cat_id, IFNULL(cat.name, '') "
+        "FROM exp "
+        "LEFT OUTER JOIN cat ON exp.cat_id = cat.cat_id "
+        "WHERE date >= ? AND date < ? "
+        "ORDER BY date DESC ";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_int(stmt, 1, tstart);
+    assert(z == 0);
+    z = sqlite3_bind_int(stmt, 2, tend);
+    assert(z == 0);
+
+    xps.clear();
+    while ((z = sqlite3_step(stmt)) == SQLITE_ROW) {
+        xp.expid = sqlite3_column_int64(stmt, 0);
+        xp.date = sqlite3_column_int(stmt, 1);
+        xp.desc = (const char *) sqlite3_column_text(stmt, 2);
+        xp.amt = sqlite3_column_double(stmt, 3);
+        xp.catid = sqlite3_column_int64(stmt, 4);
+        xp.catname = (const char *) sqlite3_column_text(stmt, 5);
+        xps.push_back(xp);
+    }
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
     return 0;
 }
 
@@ -349,3 +378,17 @@ int DelExpense(sqlite3 *db, const Expense& xp) {
     sqlite3_finalize(stmt);
     return 0;
 }
+int RefreshExpenseCatName(sqlite3 *db, Expense& xp) {
+    int z;
+    vector<Category> cats;
+
+    z = FindCategoryByID(db, xp.catid, cats);
+    if (z != 0) {
+        return z;
+    }
+    if (cats.size() > 0) {
+        xp.catname = cats[0].name;
+    }
+    return 0;
+}
+

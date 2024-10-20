@@ -32,11 +32,14 @@ int file_exists(const char *file);
 int create_expense_file(const char *dbfile, sqlite3 **pdb);
 int open_expense_file(const char *dbfile, sqlite3 **pdb);
 
-int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps);
 int SelectCategories(sqlite3 *db, vector<Category>& cats);
+int FindCategoryByID(sqlite3 *db, uint64_t catid, vector<Category>& cats);
+int AddCategory(sqlite3 *db, Category& cat);
+
+int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps);
 int AddExpense(sqlite3 *db, Expense& xp);
 int UpdateExpense(sqlite3 *db, const Expense& xp);
 int DelExpense(sqlite3 *db, const Expense& xp);
-int AddCategory(sqlite3 *db, Category& cat);
+int RefreshExpenseCatName(sqlite3 *db, Expense& xp);
 
 #endif
