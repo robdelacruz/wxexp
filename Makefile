@@ -38,8 +38,8 @@ sqlite3.o: sqlite3/sqlite3.c
 t: $(OBJECTS)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-expconv: expconv.c clib.o db.o sqlite3.o
-	$(CC) $(CFLAGS) -o $@ $^
+expconv: expconv.cpp clib.o db.o sqlite3.o
+	$(CXX) $(CPPFLAGS) -o $@ $^
 
 clean:
 	rm -rf t $(OBJECTS)

@@ -37,5 +37,6 @@ int SelectCategories(sqlite3 *db, vector<Category>& cats);
 int AddExpense(sqlite3 *db, Expense& xp);
 int UpdateExpense(sqlite3 *db, const Expense& xp);
 int DelExpense(sqlite3 *db, const Expense& xp);
+int AddCategory(sqlite3 *db, Category& cat);
 
 #endif

@@ -217,6 +217,54 @@ int SelectCategories(sqlite3 *db, vector<Category>& cats) {
     return 0;
 }
 
+// Create new category if cat.name doesn't exist,
+// else, returns existing category with cat.name in cat.
+int AddCategory(sqlite3 *db, Category& cat) {
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    assert(cat.catid == 0);
+
+    // If category name already exists in db, return existing record without adding.
+    s = "SELECT cat_id, name FROM cat WHERE name = ?";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_text(stmt, 1, cat.name.c_str(), -1, NULL);
+    assert(z == 0);
+
+    z = sqlite3_step(stmt);
+    if (z == SQLITE_ROW) {
+        cat.catid = sqlite3_column_int64(stmt, 0);
+        cat.name = (const char *) sqlite3_column_text(stmt, 1);
+        sqlite3_finalize(stmt);
+        return 0;
+    }
+
+    // Category name doesn't exist, add new record.
+    s = "INSERT INTO cat (name) VALUES (?);";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_text(stmt, 1, cat.name.c_str(), -1, NULL);
+    assert(z == 0);
+
+    z = sqlite3_step(stmt);
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
+
+    cat.catid = sqlite3_last_insert_rowid(db);
+    return 0;
+}
+
 int AddExpense(sqlite3 *db, Expense& xp) {
     sqlite3_stmt *stmt;
     const char *s;

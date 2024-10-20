@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,10 +7,10 @@
 
 #include "clib.h"
 #include "db.h"
+using namespace std;
 
 void convert_expense_file(sqlite3 *db, const char *srcfile);
-static void read_expense(sqlite3 *db, char *buf, exp_t *xp);
-uint64_t find_or_create_category_name(sqlite3 *db, str_t *catname);
+static void read_expense(sqlite3 *db, char *buf, Expense *xp);
 
 static void chomp(char *buf);
 static char *skip_ws(char *startp);
@@ -19,7 +18,7 @@ static char *read_field(char *startp, char **field);
 static char *read_field_date(char *startp, date_t *dt);
 static char *read_field_double(char *startp, double *field);
 static char *read_field_uint(char *startp, uint *n);
-static char *read_field_str(char *startp, str_t *str);
+static char *read_field_str(char *startp, string *str);
 
 int main(int argc, char *argv[]) {
     const char *expenses_text_file;
@@ -42,11 +41,11 @@ int main(int argc, char *argv[]) {
 
     z = create_expense_file(newdbfile, &db);
     if (z == DB_FILE_EXISTS) {
-        fprintf(stderr, "DB File '%s' already exists.\n", newdbfile);
+        fprintf(stderr, "Expense File '%s' already exists.\n", newdbfile);
         exit(1);
     }
     if (z != 0) {
-        fprintf(stderr, "create_expense_file() error: %d.\n", z);
+        fprintf(stderr, "create_expense_file() error: %s\n", db_strerror(z));
         exit(1);
     }
 
@@ -60,7 +59,7 @@ void convert_expense_file(sqlite3 *db, const char *srcfile) {
     char *buf;
     size_t buf_size;
     int z;
-    exp_t *xp;
+    Expense xp;
     int numlines = 0;
 
     f = fopen(srcfile, "r");
@@ -69,9 +68,7 @@ void convert_expense_file(sqlite3 *db, const char *srcfile) {
         return;
     }
 
-
-    xp = exp_new();
-    buf = malloc(BUFLINE_SIZE);
+    buf = (char *) malloc(BUFLINE_SIZE);
     buf_size = BUFLINE_SIZE;
 
     sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
@@ -89,10 +86,10 @@ void convert_expense_file(sqlite3 *db, const char *srcfile) {
         if (strlen(buf) == 0)
             continue;
 
-        read_expense(db, buf, xp);
-        z = db_add_exp(db, xp);
+        read_expense(db, buf, &xp);
+        z = AddExpense(db, xp);
         if (z != 0) {
-            fprintf(stderr, "sqlite3 db_add_exp error: %d\n", z);
+            fprintf(stderr, "AddExpense() error: %s\n", db_strerror(z));
             break;
         }
 
@@ -101,58 +98,35 @@ void convert_expense_file(sqlite3 *db, const char *srcfile) {
     printf("Number of expenses converted: %d\n", numlines);
     sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, NULL);
 
-    exp_free(xp);
     free(buf);
     fclose(f);
 }
 
 
-static void read_expense(sqlite3 *db, char *buf, exp_t *xp) {
+static void read_expense(sqlite3 *db, char *buf, Expense *xp) {
     // Sample expense line:
     // 2016-05-01; 00:00; Mochi Cream coffee; 100.00; coffee
-    str_t *isodate = str_new(0);
-    str_t *stime = str_new(0);
-    str_t *catname = str_new(0);
+    string stime;
+    Category cat;
 
     char *p = buf;
     p = read_field_date(p, &xp->date);
-    p = read_field_str(p, stime);
-    p = read_field_str(p, xp->desc);
+    p = read_field_str(p, &stime);
+    p = read_field_str(p, &xp->desc);
     p = read_field_double(p, &xp->amt);
-    p = read_field_str(p, catname);
+    p = read_field_str(p, &cat.name);
+
+    // Create new category if cat.name doesn't exist,
+    // else, returns existing category with cat.name in cat.
+    cat.catid = 0;
+    AddCategory(db, cat);
 
     xp->expid = 0;
-    xp->catid = find_or_create_category_name(db, catname);
+    xp->catid = cat.catid;
 
     printf("Adding expense date: %ld desc: '%s' amt: %.2f catid: %ld\n",
-            xp->date, xp->desc->s, xp->amt, xp->catid);
+            xp->date, xp->desc.c_str(), xp->amt, xp->catid);
 }
-uint64_t find_or_create_category_name(sqlite3 *db, str_t *catname) {
-    int z;
-    uint64_t catid;
-    cat_t *cat;
-
-    z = db_find_cat_by_name(db, catname->s, &catid);
-    if (z != 0) {
-        fprintf(stderr, "find_or_create_category_name() sqlite db_find_cat_by_name error: %d\n", z);
-        return 0;
-    }
-    if (catid > 0)
-        return catid;
-
-    cat = cat_new();
-    str_assign(cat->name, catname->s);
-    z = db_add_cat(db, cat);
-    if (z != 0) {
-        fprintf(stderr, "find_or_create_category_name() sqlite db_add_cat error: %d\n", z);
-        return 0;
-    }
-    catid = cat->catid;
-    cat_free(cat);
-
-    return catid;
-}
-
 // Remove trailing \n or \r chars.
 static void chomp(char *buf) {
     ssize_t buf_len = strlen(buf);
@@ -199,10 +173,10 @@ static char *read_field_uint(char *startp, uint *n) {
     *n = atoi(sfield);
     return p;
 }
-static char *read_field_str(char *startp, str_t *str) {
+static char *read_field_str(char *startp, string *str) {
     char *sfield;
     char *p = read_field(startp, &sfield);
-    str_assign(str, sfield);
+    *str = sfield;
     return p;
 }
 
