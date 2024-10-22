@@ -203,6 +203,35 @@ int FindCategoryByID(sqlite3 *db, uint64_t catid, vector<Category>& cats) {
     sqlite3_finalize(stmt);
     return 0;
 }
+int FindCategoryByName(sqlite3 *db, string name, vector<Category>& cats) {
+    Category cat;
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    s = "SELECT cat_id, name FROM cat WHERE name = ?";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_text(stmt, 1, name.c_str(), -1, NULL);
+    assert(z == 0);
+
+    cats.clear();
+    while ((z = sqlite3_step(stmt)) == SQLITE_ROW) {
+        cat.catid = sqlite3_column_int64(stmt, 0);
+        cat.name = (const char *) sqlite3_column_text(stmt, 1);
+        cats.push_back(cat);
+    }
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
+    return 0;
+}
+
 
 // Create new category if cat.name doesn't exist,
 // else, returns existing category with cat.name in cat.
@@ -213,7 +242,7 @@ int AddCategory(sqlite3 *db, Category& cat) {
 
     assert(cat.catid == 0);
 
-    // If category name already exists in db, return existing record without adding.
+    // If category name already exists, don't do anything.
     s = "SELECT cat_id, name FROM cat WHERE name = ?";
     z = prepare_sql(db, s, &stmt);
     if (z != 0) {
@@ -249,6 +278,52 @@ int AddCategory(sqlite3 *db, Category& cat) {
     sqlite3_finalize(stmt);
 
     cat.catid = sqlite3_last_insert_rowid(db);
+    return 0;
+}
+int UpdateCategory(sqlite3 *db, const Category& cat) {
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    s = "UPDATE cat SET name = ? WHERE cat_id = ?";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_text(stmt, 1, cat.name.c_str(), -1, NULL);
+    assert(z == 0);
+    z = sqlite3_bind_int(stmt, 2, cat.catid);
+    assert(z == 0);
+
+    z = sqlite3_step(stmt);
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
+    return 0;
+}
+int DelCategory(sqlite3 *db, const Category& cat) {
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    s = "DELETE FROM cat WHERE cat_id = ?";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    z = sqlite3_bind_int(stmt, 1, cat.catid);
+    assert(z == 0);
+
+    z = sqlite3_step(stmt);
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
     return 0;
 }
 
