@@ -2,7 +2,7 @@ CC=gcc
 CXX=g++
 
 CSOURCES=clib.c
-CPPSOURCES=db.cpp eb.cpp wxutil.cpp
+CPPSOURCES=wxutil.cpp db.cpp eb.cpp EditExpenseDialog.cpp SetupCategoriesDialog.cpp
 COBJECTS=$(patsubst %.c, %.o, $(CSOURCES))
 CPPOBJECTS=$(patsubst %.cpp, %.o, $(CPPSOURCES))
 OBJECTS=$(COBJECTS) $(CPPOBJECTS) sqlite3.o

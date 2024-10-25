@@ -327,6 +327,39 @@ int DelCategory(sqlite3 *db, const Category& cat) {
     return 0;
 }
 
+int SelectCategoryTotals(sqlite3 *db, vector<CategoryTotal>& cattotals) {
+    CategoryTotal cattotal;
+    sqlite3_stmt *stmt;
+    const char *s;
+    int z;
+
+    s = "SELECT cat_id, name, "
+        "(SELECT COUNT(*) FROM exp WHERE exp.cat_id = cat.cat_id) AS numexpenses, "
+        "(SELECT SUM(exp.amt) FROM exp WHERE exp.cat_id = cat.cat_id) AS totalamt "
+        "FROM cat "
+        "ORDER BY name";
+    z = prepare_sql(db, s, &stmt);
+    if (z != 0) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+
+    cattotals.clear();
+    while ((z = sqlite3_step(stmt)) == SQLITE_ROW) {
+        cattotal.catid = sqlite3_column_int64(stmt, 0);
+        cattotal.name = (const char *) sqlite3_column_text(stmt, 1);
+        cattotal.numexpenses = sqlite3_column_int64(stmt, 2);
+        cattotal.totalamt = sqlite3_column_double(stmt, 3);
+        cattotals.push_back(cattotal);
+    }
+    if (z != SQLITE_DONE) {
+        db_handle_err(db, stmt, s);
+        return z;
+    }
+    sqlite3_finalize(stmt);
+    return 0;
+}
+
 int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps) {
     Expense xp;
     sqlite3_stmt *stmt;

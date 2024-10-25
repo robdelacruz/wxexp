@@ -2,37 +2,13 @@
 #include "wx/window.h"
 #include "wx/colour.h"
 #include "wx/listctrl.h"
-#include "wx/datectrl.h"
-#include "wx/valgen.h"
-#include "wx/valnum.h"
 
-#include "db.h"
 #include "wxutil.h"
+#include "ids.h"
+#include "db.h"
+#include "EditExpenseDialog.h"
+#include "SetupCategoriesDialog.h"
 
-enum {
-    ID_START = wxID_HIGHEST,
-    ID_VIEW_EXP,
-    ID_VIEW_CAT,
-    ID_VIEW_YTD,
-    ID_EXPENSE_NEW,
-    ID_EXPENSE_EDIT,
-    ID_EXPENSE_DEL,
-    ID_EXPENSE_CATEGORIES,
-    ID_EXPENSES_PANEL,
-    ID_EXPENSES_MONTH,
-    ID_EXPENSES_YEAR,
-    ID_EXPENSES_PREVMONTH,
-    ID_EXPENSES_NEXTMONTH,
-    ID_EXPENSES_PREVYEAR,
-    ID_EXPENSES_NEXTYEAR,
-    ID_EXPENSES_LISTVIEW,
-    ID_SETUPCATEGORIES_LB,
-    ID_COUNT
-};
-
-//
-// ExpFrame
-// 
 class ExpFrame : public wxFrame {
 private:
     sqlite3 *m_db = NULL;
@@ -90,55 +66,6 @@ public:
     virtual bool OnInit();
 };
 wxIMPLEMENT_APP(ExpApp);
-
-//
-// EditExpenseDialog
-//
-class EditExpenseDialog : public wxDialog {
-public:
-    Expense& m_xp;
-
-    EditExpenseDialog(wxWindow *parent, sqlite3 *db, Expense& xp);
-private:
-    sqlite3 *m_db;
-    wxString m_desc;
-    double m_amt;
-    int m_icatsel=wxNOT_FOUND;
-    wxDatePickerCtrl *m_dpDate;
-    vector<Category> m_cats;
-    wxChoice *m_chCat;
-
-    void CreateControls();
-    bool TransferDataFromWindow();
-};
-
-//
-// SetupCategoriesDialog
-//
-class SetupCategoriesDialog : public wxDialog {
-public:
-    SetupCategoriesDialog(wxWindow *parent, sqlite3 *db);
-
-private:
-    sqlite3 *m_db;
-    wxListBox *m_lb;
-    vector<Category> m_cats;
-
-    void CreateControls();
-    void RefreshControls();
-    void OnListBoxSelected(wxCommandEvent& event);
-    void OnAdd(wxCommandEvent& event);
-    void OnEdit(wxCommandEvent& event);
-    void OnDelete(wxCommandEvent& event);
-
-    wxDECLARE_EVENT_TABLE();
-};
-wxBEGIN_EVENT_TABLE(SetupCategoriesDialog, wxDialog)
-    EVT_LISTBOX(ID_SETUPCATEGORIES_LB, SetupCategoriesDialog::OnListBoxSelected)
-    EVT_BUTTON(wxID_ADD, SetupCategoriesDialog::OnAdd)
-    EVT_BUTTON(wxID_EDIT, SetupCategoriesDialog::OnEdit)
-    EVT_BUTTON(wxID_DELETE, SetupCategoriesDialog::OnDelete)
-wxEND_EVENT_TABLE()
 
 bool ExpApp::OnInit() {
     ExpFrame *w = new ExpFrame("Expense Buddy GUI");
@@ -206,10 +133,11 @@ void ExpFrame::CreateControls() {
     wxStaticText *stYear = new wxStaticText(pnlHead, ID_EXPENSES_YEAR, "Year", wxDefaultPosition, wxSize(w+8,h), wxALIGN_CENTRE_HORIZONTAL|wxST_NO_AUTORESIZE);
     stYear->SetBackgroundColour(wxColour(0xff,0xff,0xff));
 
-    wxButton *btnPrevMonth = new wxButton(pnlHead, ID_EXPENSES_PREVMONTH, "<", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
-    wxButton *btnNextMonth = new wxButton(pnlHead, ID_EXPENSES_NEXTMONTH, ">", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
-    wxButton *btnPrevYear = new wxButton(pnlHead, ID_EXPENSES_PREVYEAR, "<", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
-    wxButton *btnNextYear = new wxButton(pnlHead, ID_EXPENSES_NEXTYEAR, ">", wxDefaultPosition, wxSize(16,-1), wxBORDER_NONE);
+    GetTextExtent("<", &w, &h);
+    wxButton *btnPrevMonth = new wxButton(pnlHead, ID_EXPENSES_PREVMONTH, "<", wxDefaultPosition, wxSize(w+8,h), wxBORDER_NONE);
+    wxButton *btnNextMonth = new wxButton(pnlHead, ID_EXPENSES_NEXTMONTH, ">", wxDefaultPosition, wxSize(w+8,h), wxBORDER_NONE);
+    wxButton *btnPrevYear = new wxButton(pnlHead, ID_EXPENSES_PREVYEAR, "<", wxDefaultPosition, wxSize(w+8,h), wxBORDER_NONE);
+    wxButton *btnNextYear = new wxButton(pnlHead, ID_EXPENSES_NEXTYEAR, ">", wxDefaultPosition, wxSize(w+8,h), wxBORDER_NONE);
     wxButton *btnNew = createButton(pnlHead, "New", ID_EXPENSE_NEW);
 
     m_lv = new FitListView(pnlTop, ID_EXPENSES_LISTVIEW);
@@ -433,7 +361,7 @@ void ExpFrame::EditExpenseRow(int ixps) {
 void ExpFrame::DelExpenseRow(int ixps) {
     Expense& xp = m_xps[ixps];
 
-    wxMessageDialog dlg(this, wxString::Format("Delete '%s'?", wxString::FromUTF8(xp.desc)), "Confirm Delete", wxYES_NO | wxNO_DEFAULT); 
+    wxMessageDialog dlg(this, wxString::Format("Delete '%s'?", xp.desc), "Confirm Delete", wxYES_NO | wxNO_DEFAULT); 
     if (dlg.ShowModal() != wxID_YES)
         return;
 
@@ -448,210 +376,5 @@ void ExpFrame::DelExpenseRow(int ixps) {
 
     m_lv->SetItemState(ixps, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
     m_lv->EnsureVisible(ixps);
-}
-
-//***
-//*** EditExpenseDialog
-//***
-EditExpenseDialog::EditExpenseDialog(wxWindow *parent, sqlite3 *db, Expense& xp)
-    : wxDialog(parent, wxID_ANY, "Edit Expense"),
-    m_xp(xp),
-    m_desc(wxString(xp.desc)),
-    m_amt(xp.amt)
-{
-    m_db = db;
-    CreateControls();
-}
-static wxStaticText *createLabel(wxWindow *parent, const wxString& text) {
-    return new wxStaticText(parent, wxID_ANY, text);
-}
-void EditExpenseDialog::CreateControls() {
-    wxPanel *pnlTop = createPanel(this);
-
-    wxStaticText *stDesc = createLabel(pnlTop, "Description");
-    wxStaticText *stAmt = createLabel(pnlTop, "Amount");
-    wxStaticText *stCat = createLabel(pnlTop, "Category");
-    wxStaticText *stDate = createLabel(pnlTop, "Date");
-
-    wxTextCtrl *tcDesc = new wxTextCtrl(pnlTop, wxID_ANY, "", wxDefaultPosition, wxSize(200,-1), 0, wxTextValidator(wxFILTER_NONE, &m_desc));
-    tcDesc->SetMaxLength(30);
-
-    wxFloatingPointValidator<double> vldAmt(2, &m_amt, wxNUM_VAL_ZERO_AS_BLANK|wxNUM_VAL_THOUSANDS_SEPARATOR);
-    wxTextCtrl *tcAmt = new wxTextCtrl(pnlTop, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, 0, vldAmt);
-
-    SelectCategories(m_db, m_cats);
-    wxArrayString acats;
-    for (int i=0; i < (int) m_cats.size(); i++) {
-        Category cat = m_cats[i];
-        acats.Add(cat.name);
-        if (m_xp.catid == cat.catid)
-            m_icatsel = i;
-    }
-    m_chCat = new wxChoice(pnlTop, wxID_ANY, wxDefaultPosition, wxDefaultSize, acats, 0, wxGenericValidator(&m_icatsel));
-    m_chCat->SetSelection(m_icatsel);
-
-    m_dpDate = new wxDatePickerCtrl(pnlTop, wxID_ANY, wxDateTime(m_xp.date), wxDefaultPosition, wxDefaultSize, wxDP_DEFAULT|wxDP_SHOWCENTURY);
-
-    wxButton *btnOK = new wxButton(pnlTop, wxID_OK);
-    wxButton *btnCancel = new wxButton(pnlTop, wxID_CANCEL);
-
-    wxFlexGridSizer *gs = new wxFlexGridSizer(4, 2, 5, 5);
-    gs->Add(stDesc,   0, wxALIGN_CENTER_VERTICAL, 0);
-    gs->Add(tcDesc,   1, wxALIGN_CENTER_VERTICAL, 0);
-    gs->Add(stAmt,    0, wxALIGN_CENTER_VERTICAL, 0);
-    gs->Add(tcAmt,    1, wxALIGN_CENTER_VERTICAL, 0);
-    gs->Add(stCat,    0, wxALIGN_CENTER_VERTICAL, 0);
-    gs->Add(m_chCat,  1, wxALIGN_CENTER_VERTICAL, 0);
-    gs->Add(stDate,   0, wxALIGN_CENTER_VERTICAL, 0);
-    gs->Add(m_dpDate, 1, wxALIGN_CENTER_VERTICAL, 0);
-
-    wxStdDialogButtonSizer *btnbox = new wxStdDialogButtonSizer();
-    btnbox->AddButton(btnOK);
-    btnbox->AddButton(btnCancel);
-    btnbox->Realize();
-
-    wxBoxSizer *vs = createVSizer();
-    vs->Add(gs, 0, wxEXPAND, 0);
-    vs->AddSpacer(10);
-    vs->Add(btnbox, 0, wxEXPAND, 0);
-    pnlTop->SetSizer(vs);
-
-    vs = createVSizer();
-    vs->Add(pnlTop, 0, wxEXPAND | wxALL, 10);
-    SetSizerAndFit(vs);
-}
-bool EditExpenseDialog::TransferDataFromWindow() {
-    wxDialog::TransferDataFromWindow();
-
-    if (m_icatsel < 0)
-        return false;
-    if (m_desc.Length() == 0)
-        return false;
-
-    m_xp.desc = m_desc;
-    m_xp.amt = m_amt;
-
-    assert(m_icatsel >= 0 && m_icatsel < (int) m_cats.size());
-    m_xp.catid = m_cats[m_icatsel].catid;
-    m_xp.date = m_dpDate->GetValue().GetTicks();
-
-    return true;
-}
-
-SetupCategoriesDialog::SetupCategoriesDialog(wxWindow *parent, sqlite3 *db)
-                 : wxDialog(parent, wxID_ANY, wxString("Setup Categories")) {
-    m_db = db;
-    CreateControls();
-    RefreshControls();
-}
-
-void SetupCategoriesDialog::CreateControls() {
-    wxPanel *pnlTop = createPanel(this);
-
-    m_lb = new wxListBox(pnlTop, ID_SETUPCATEGORIES_LB, wxDefaultPosition, wxSize(200,200));
-    wxButton *btnAdd = createButton(pnlTop, "&Add", wxID_ADD);
-    wxButton *btnEdit = createButton(pnlTop, "&Edit", wxID_EDIT);
-    wxButton *btnDel = createButton(pnlTop, "&Delete", wxID_DELETE);
-    wxButton *btnClose = createButton(pnlTop, "&Close", wxID_CANCEL);
-    btnClose->SetDefault();
-
-    wxBoxSizer *vsLeft = createVSizer();
-    vsLeft->Add(m_lb, 0, wxEXPAND, 0);
-
-    wxBoxSizer *vsRight = createVSizer();
-    vsRight->Add(btnAdd, 0, wxEXPAND, 0);
-    vsRight->AddSpacer(5);
-    vsRight->Add(btnEdit, 0, wxEXPAND, 0);
-    vsRight->AddSpacer(5);
-    vsRight->Add(btnDel, 0, wxEXPAND, 0);
-    vsRight->AddSpacer(5);
-    vsRight->Add(btnClose, 0, wxEXPAND, 0);
-
-    wxBoxSizer *hs = createHSizer();
-    hs->Add(vsLeft, 0, wxEXPAND, 0);
-    hs->AddSpacer(10);
-    hs->Add(vsRight, 0, wxFIXED_MINSIZE, 0);
-    pnlTop->SetSizer(hs);
-
-    wxBoxSizer *vs = createVSizer();
-    vs->Add(pnlTop, 0, wxEXPAND | wxALL, 10);
-    SetSizerAndFit(vs);
-
-}
-void SetupCategoriesDialog::RefreshControls() {
-    SelectCategories(m_db, m_cats);
-
-    wxArrayString cats;
-    for (int i=0; i < (int) m_cats.size(); i++) {
-        Category &cat = m_cats[i];
-        cats.Add(cat.name);
-    }
-
-    m_lb->Clear();
-    m_lb->InsertItems(cats, 0);
-
-    if (m_lb->GetCount() > 0) {
-        m_lb->SetSelection(0);
-        m_lb->EnsureVisible(0);
-    }
-    m_lb->SetFocus();
-}
-void SetupCategoriesDialog::OnListBoxSelected(wxCommandEvent& event) {
-}
-void SetupCategoriesDialog::OnAdd(wxCommandEvent& event) {
-    wxTextEntryDialog dlg(this, "Enter new category", "New category");
-    if (dlg.ShowModal() == wxID_CANCEL)
-        return;
-
-    string catname = dlg.GetValue().ToStdString();
-    if (catname.size() == 0)
-        return;
-
-    Category cat;
-    cat.catid = 0;
-    cat.name = catname;
-    AddCategory(m_db, cat);
-    RefreshControls();
-}
-void SetupCategoriesDialog::OnEdit(wxCommandEvent& event) {
-    int z;
-    int sel = m_lb->GetSelection();
-    if (sel == wxNOT_FOUND)
-        return;
-    if (sel < 0 || sel > (int) m_cats.size()-1)
-        return;
-
-    Category& cat = m_cats[sel];
-    wxTextEntryDialog dlg(this, "Rename category", "Edit category", cat.name);
-    if (dlg.ShowModal() == wxID_CANCEL)
-        return;
-
-    string catname = dlg.GetValue().ToStdString();
-    if (catname.size() == 0)
-        return;
-
-    vector<Category> cats;
-    z = FindCategoryByName(m_db, catname, cats);
-    if (z != 0)
-        return;
-    if (cats.size() > 0) {
-        wxMessageDialog dlg(this, wxString::Format("Category '%s' already exists", catname));
-        dlg.ShowModal();
-        return;
-    }
-
-    cat.name = catname;
-    UpdateCategory(m_db, cat);
-    RefreshControls();
-}
-void SetupCategoriesDialog::OnDelete(wxCommandEvent& event) {
-//    int z;
-    int sel = m_lb->GetSelection();
-    if (sel == wxNOT_FOUND)
-        return;
-    if (sel < 0 || sel > (int) m_cats.size()-1)
-        return;
-
-//    Category& cat = m_cats[sel];
 }
 

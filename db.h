@@ -27,6 +27,13 @@ struct Expense {
     string catname;
 };
 
+struct CategoryTotal {
+    uint64_t catid;
+    string name;
+    int numexpenses;
+    double totalamt;
+};
+
 const char *db_strerror(int errnum);
 int file_exists(const char *file);
 int create_expense_file(const char *dbfile, sqlite3 **pdb);
@@ -38,6 +45,8 @@ int FindCategoryByName(sqlite3 *db, string name, vector<Category>& cats);
 int AddCategory(sqlite3 *db, Category& cat);
 int UpdateCategory(sqlite3 *db, const Category& cat);
 int DelCategory(sqlite3 *db, const Category& cat);
+
+int SelectCategoryTotals(sqlite3 *db, vector<CategoryTotal>& cattotals);
 
 int SelectExpensesByMonth(sqlite3 *db, int year, int month, vector<Expense>& xps);
 int AddExpense(sqlite3 *db, Expense& xp);
