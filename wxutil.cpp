@@ -39,6 +39,12 @@ void selectFirstListViewRow(wxListView *lv) {
         lv->EnsureVisible(0);
     }
 }
+void selectFirstListBoxRow(wxListBox *lb) {
+    if (lb->GetCount() > 0) {
+        lb->SetSelection(0);
+        lb->EnsureVisible(0);
+    }
+}
 
 wxBEGIN_EVENT_TABLE(FitListView, wxListView)
     EVT_SIZE(FitListView::OnSize)

@@ -19,6 +19,7 @@ private:
 
     void CreateControls();
     void RefreshControls();
+    void EnableButtons(int isel);
     void OnListBoxSelected(wxCommandEvent& event);
     void OnNew(wxCommandEvent& event);
     void OnRename(wxCommandEvent& event);

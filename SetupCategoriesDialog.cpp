@@ -17,6 +17,8 @@ SetupCategoriesDialog::SetupCategoriesDialog(wxWindow *parent, sqlite3 *db)
     m_db = db;
     CreateControls();
     RefreshControls();
+    selectFirstListBoxRow(m_lb);
+    EnableButtons(0);
 }
 
 void SetupCategoriesDialog::CreateControls() {
@@ -50,8 +52,6 @@ void SetupCategoriesDialog::CreateControls() {
     wxBoxSizer *vs = createVSizer();
     vs->Add(pnlTop, 0, wxEXPAND | wxALL, 10);
     SetSizerAndFit(vs);
-
-    m_btnDel->Enable(false);
 }
 void SetupCategoriesDialog::RefreshControls() {
     SelectCategoryTotals(m_db, m_cattotals);
@@ -65,29 +65,29 @@ void SetupCategoriesDialog::RefreshControls() {
     m_lb->Clear();
     if (lbitems.size() > 0)
         m_lb->InsertItems(lbitems, 0);
-
-    if (m_lb->GetCount() > 0) {
-        m_lb->SetSelection(0);
-        m_lb->EnsureVisible(0);
-
-        m_btnRename->Enable(true);
-    } else {
-        m_btnRename->Enable(false);
-    }
     m_lb->SetFocus();
 }
-void SetupCategoriesDialog::OnListBoxSelected(wxCommandEvent& event) {
-    int isel = event.GetSelection();
-    if (isel == wxNOT_FOUND)
-        return;
+void SetupCategoriesDialog::EnableButtons(int isel) {
+    if (m_cattotals.size() == 0) {
+        m_btnRename->Enable(false);
+        m_btnDel->Enable(false);
+    }
     if (isel > (int) m_cattotals.size()-1)
         return;
+
+    m_btnRename->Enable(true);
     CategoryTotal cattotal = m_cattotals[isel];
     // Can't delete if there are existing expenses with this selected category.
     if (cattotal.numexpenses > 0)
         m_btnDel->Enable(false);
     else
         m_btnDel->Enable(true);
+}
+void SetupCategoriesDialog::OnListBoxSelected(wxCommandEvent& event) {
+    int isel = event.GetSelection();
+    if (isel == wxNOT_FOUND)
+        return;
+    EnableButtons(isel);
 }
 void SetupCategoriesDialog::OnNew(wxCommandEvent& event) {
     wxTextEntryDialog dlg(this, "New category", "Action");
@@ -103,6 +103,21 @@ void SetupCategoriesDialog::OnNew(wxCommandEvent& event) {
     cat.name = catname;
     AddCategory(m_db, cat);
     RefreshControls();
+
+    if (m_cattotals.size() == 0)
+        return;
+
+    int isel=0;
+    for (int i=0; i < (int) m_cattotals.size(); i++) {
+        if (m_cattotals[i].catid == cat.catid) {
+            isel = i;
+            break;
+        }
+    }
+    assert(m_lb->GetCount() > 0);
+    m_lb->SetSelection(isel);
+    m_lb->EnsureVisible(isel);
+    EnableButtons(isel);
 }
 void SetupCategoriesDialog::OnRename(wxCommandEvent& event) {
     int z;
@@ -135,7 +150,8 @@ void SetupCategoriesDialog::OnRename(wxCommandEvent& event) {
     cat.catid = cattotal.catid;
     cat.name = catname;
     UpdateCategory(m_db, cat);
-    RefreshControls();
+
+    m_lb->SetString(isel, catname);
 }
 void SetupCategoriesDialog::OnDelete(wxCommandEvent& event) {
     int isel = m_lb->GetSelection();
@@ -155,6 +171,15 @@ void SetupCategoriesDialog::OnDelete(wxCommandEvent& event) {
     Category cat;
     cat.catid = cattotal.catid;
     DelCategory(m_db, cat);
+
     RefreshControls();
+    if (m_lb->GetCount() == 0)
+        return;
+    if (isel >= (int) m_lb->GetCount())
+        isel = m_lb->GetCount()-1;
+
+    m_lb->SetSelection(isel);
+    m_lb->EnsureVisible(isel);
+    EnableButtons(isel);
 }
 
