@@ -292,19 +292,26 @@ void ExpFrame::OnExpenseEdit(wxCommandEvent& event) {
     long sel = m_lv->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
     if (sel == -1)
         return;
-    int ixps = (int) m_lv->GetItemData(sel);
-    EditExpenseRow(ixps);
+    assert(sel < (long) m_xps.size());
+    EditExpenseRow(sel);
 }
 void ExpFrame::OnExpenseDel(wxCommandEvent& event) {
     long sel = m_lv->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
     if (sel == -1)
         return;
-    int ixps = (int) m_lv->GetItemData(sel);
-    DelExpenseRow(ixps);
+    assert(sel < (long) m_xps.size());
+    DelExpenseRow(sel);
 }
 void ExpFrame::OnExpenseCategories(wxCommandEvent& event) {
     SetupCategoriesDialog dlg(this, m_db);
     dlg.ShowModal();
+
+    // Update category names
+    for (int i=0; i < (int) m_xps.size(); i++) {
+        Expense& xp = m_xps[i];
+        RefreshExpenseCatName(m_db, xp);
+        m_lv->SetItem(i, 3, xp.catname);
+    }
 }
 
 void ExpFrame::OnPrevMonth(wxCommandEvent& e) {
@@ -337,11 +344,9 @@ void ExpFrame::OnNextYear(wxCommandEvent& e) {
 }
 
 void ExpFrame::OnExpenseActivated(wxListEvent& e) {
-    wxListItem li = e.GetItem();
-    int ixps = (int) li.GetData();
-    if (ixps > (int) m_xps.size()-1)
-        return;
-    EditExpenseRow(ixps);
+    long ixps = e.GetIndex();
+    assert(ixps < (int) m_xps.size());
+    EditExpenseRow((int) ixps);
 }
 
 void ExpFrame::EditExpenseRow(int ixps) {
@@ -366,9 +371,10 @@ void ExpFrame::DelExpenseRow(int ixps) {
         return;
 
     DelExpense(m_db, xp);
+    m_xps.erase(m_xps.begin() + ixps);
+    m_lv->DeleteItem(ixps);
 
-    // Refresh expenses list and select the next expense following the deleted one.
-    RefreshControls();
+    // Select the next expense following the deleted one.
     if (m_xps.size() == 0)
         return;
     if (ixps >= (int) m_xps.size())
